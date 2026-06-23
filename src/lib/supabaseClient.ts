@@ -1,11 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
-import { projectId, publicAnonKey } from '/utils/supabase/info';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Create a single shared Supabase client instance
 // This prevents "Multiple GoTrueClient instances" warning
 export const supabase = createClient(
-  `https://${projectId}.supabase.co`,
-  publicAnonKey,
+  supabaseUrl,
+  supabaseAnonKey,
   {
     auth: {
       persistSession: true,
@@ -13,3 +15,4 @@ export const supabase = createClient(
     }
   }
 );
+
