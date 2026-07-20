@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Plus, Trash2, TrendingUp, TrendingDown, DollarSign, PieChart, Save } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
+import TripExpense from './TripExpense';
 
 type Person = 'partner1' | 'partner2' | 'both';
 type Category =
@@ -43,15 +44,28 @@ export default function Expenditure({ activePerson, partner1Name, partner2Name, 
   const [monthlyBudget, setMonthlyBudget, saveBudget, hasUnsavedBudget] = useSupabasePersistedState<number>('expenses_budget', 2000, 2000, accessToken);
   const [showSaved, setShowSaved] = useState(false);
 
-  const hasUnsavedChanges = hasUnsavedExpenses || hasUnsavedBudget;
+  const [hasUnsavedTrip, setHasUnsavedTrip] = useState(false);
+  const saveTripRef = useRef<() => void>(() => {});
+
+  const handleTripStateChange = useCallback((hasUnsaved: boolean, saveFn: () => void) => {
+    setHasUnsavedTrip(hasUnsaved);
+    saveTripRef.current = saveFn;
+  }, []);
+
+  const hasUnsavedChanges = hasUnsavedExpenses || hasUnsavedBudget || hasUnsavedTrip;
 
   useEffect(() => {
-    onUnsavedChanges?.(hasUnsavedChanges, () => { saveExpenses(); saveBudget(); });
+    onUnsavedChanges?.(hasUnsavedChanges, () => {
+      saveExpenses();
+      saveBudget();
+      saveTripRef.current();
+    });
   }, [hasUnsavedChanges]);
 
   const handleSave = () => {
     saveExpenses();
     saveBudget();
+    saveTripRef.current();
     setShowSaved(true);
     setTimeout(() => setShowSaved(false), 2000);
   };
@@ -360,6 +374,15 @@ export default function Expenditure({ activePerson, partner1Name, partner2Name, 
           )}
         </div>
       </div>
+
+      {/* Trip Expense */}
+      <TripExpense
+        activePerson={activePerson}
+        partner1Name={partner1Name}
+        partner2Name={partner2Name}
+        accessToken={accessToken}
+        onChangeState={handleTripStateChange}
+      />
 
       {/* Confirm delete dialog */}
       {confirmDelete && (
