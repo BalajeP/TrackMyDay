@@ -170,27 +170,6 @@ function ReminderModal({
               className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
             />
           </div>
-
-          {/* Person */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Assign To</label>
-            <div className="flex gap-2">
-              {(['partner1', 'partner2', 'both'] as Person[]).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPerson(p)}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    person === p
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {p === 'both' ? 'Both' : p === 'partner1' ? partner1Name : partner2Name}
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
@@ -623,13 +602,6 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                     </button>
                   </>
                 )}
-                <VisibilityPopover
-                  categoryId={category.id}
-                  currentPerson={category.person}
-                  partner1Name={partner1Name}
-                  partner2Name={partner2Name}
-                  onChange={setCategoryPerson}
-                />
                 <button
                   onClick={() => setConfirmDelete({ type: 'category', categoryId: category.id, categoryName: category.name })}
                   className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
@@ -651,12 +623,7 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-gray-200">
-                          {/* Person column only shown for shared categories */}
-                          {category.person === 'both' && (
-                            <th className="px-3 py-2 text-left">
-                              <span className="text-xs font-medium text-gray-500">User</span>
-                            </th>
-                          )}
+
                           {category.columns.map((col) => (
                             <th key={col.id} className="px-3 py-2 text-left">
                               {editingColumn?.categoryId === category.id && editingColumn?.columnId === col.id ? (
@@ -727,19 +694,7 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                                   : 'hover:bg-gray-50'
                               }`}
                             >
-                              {/* Person badge for shared categories */}
-                              {category.person === 'both' && (
-                                <td className="px-3 py-2.5">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    entry.person === 'partner1'
-                                      ? 'bg-indigo-100 text-indigo-700'
-                                      : 'bg-pink-100 text-pink-700'
-                                  }`}>
-                                    <User className="w-3 h-3" />
-                                    {getPersonName(entry.person as 'partner1' | 'partner2')}
-                                  </span>
-                                </td>
-                              )}
+
 
                               {/* Data cells */}
                               {category.columns.map((col) => (

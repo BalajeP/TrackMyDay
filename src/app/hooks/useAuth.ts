@@ -73,6 +73,31 @@ export function useAuth() {
     await supabase.auth.signOut();
   };
 
+  const resetPassword = async (email: string, newPassword: string): Promise<boolean> => {
+    setError(null);
+    try {
+      const { data, error } = await supabase.rpc('reset_user_password', {
+        user_email: email,
+        new_password: newPassword,
+      });
+
+      if (error) {
+        setError(error.message);
+        return false;
+      }
+
+      if (!data) {
+        setError('No account found with this email address.');
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      setError(`Failed to reset password: ${err}`);
+      return false;
+    }
+  };
+
   return {
     session,
     user,
@@ -82,6 +107,7 @@ export function useAuth() {
     login,
     signup,
     logout,
+    resetPassword,
     clearError: () => setError(null),
   };
 }

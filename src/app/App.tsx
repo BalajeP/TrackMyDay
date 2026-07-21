@@ -195,7 +195,7 @@ function PartnerButton({ profile, active, onSelect, onEdit }: { profile: Partner
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { accessToken, loading: authLoading, error: authError, login, signup, logout, clearError } = useAuth();
+  const { accessToken, loading: authLoading, error: authError, login, signup, logout, resetPassword, clearError } = useAuth();
   const { isInstallable, promptInstall } = usePWA();
 
   const [config, setConfig, saveConfig] = useSupabasePersistedState<AppConfig>('app_config', DEFAULT_CONFIG, DEFAULT_CONFIG, accessToken);
@@ -213,17 +213,12 @@ export default function App() {
     else currentSaveFnRef.current = null;
   }, []);
 
-  const { partner1, partner2, activePerson, activeTab } = config;
+  const { partner1, activeTab } = config;
+  const activePerson = 'partner1' as Person;
+  const partner2 = { name: '', avatarType: 'letter' as const, letter: 'P', bgColor: '#ec4899' };
+
   const setPartner1 = (p: PartnerProfile) => {
     setConfig((s) => ({ ...s, partner1: p }));
-    setTimeout(saveConfig, 0);
-  };
-  const setPartner2 = (p: PartnerProfile) => {
-    setConfig((s) => ({ ...s, partner2: p }));
-    setTimeout(saveConfig, 0);
-  };
-  const setActivePerson = (p: Person) => {
-    setConfig((s) => ({ ...s, activePerson: p }));
     setTimeout(saveConfig, 0);
   };
   const commitTabChange = (t: Tab) => {
@@ -261,7 +256,7 @@ export default function App() {
     { id: 'calendar' as Tab, label: 'Calendar', icon: Calendar },
   ];
 
-  const sharedProps = { activePerson, partner1Name: partner1.name, partner2Name: partner2.name, accessToken };
+  const sharedProps = { activePerson, partner1Name: partner1.name, partner2Name: '', accessToken };
 
   if (authLoading) {
     return (
@@ -279,7 +274,7 @@ export default function App() {
   if (!accessToken) {
     return (
       <PWAWrapper>
-        <AuthPage onLogin={login} onSignup={signup} error={authError} clearError={clearError} />
+        <AuthPage onLogin={login} onSignup={signup} onResetPassword={resetPassword} error={authError} clearError={clearError} />
       </PWAWrapper>
     );
   }
@@ -299,8 +294,7 @@ export default function App() {
             </div>
 
             <div className="flex items-end gap-3 flex-shrink-0">
-              <PartnerButton profile={partner1} active={activePerson === 'partner1'} onSelect={() => setActivePerson('partner1')} onEdit={() => setEditingPartner('partner1')} />
-              <PartnerButton profile={partner2} active={activePerson === 'partner2'} onSelect={() => setActivePerson('partner2')} onEdit={() => setEditingPartner('partner2')} />
+              <PartnerButton profile={partner1} active={true} onSelect={() => {}} onEdit={() => setEditingPartner('partner1')} />
 
               {isInstallable && (
                 <button onClick={promptInstall} title="Install app" className="flex flex-col items-center gap-1 group">
@@ -395,8 +389,8 @@ export default function App() {
 
       {editingPartner && (
         <AvatarPickerModal
-          profile={editingPartner === 'partner1' ? partner1 : partner2}
-          onSave={(p) => editingPartner === 'partner1' ? setPartner1(p) : setPartner2(p)}
+          profile={partner1}
+          onSave={setPartner1}
           onClose={() => setEditingPartner(null)}
         />
       )}
