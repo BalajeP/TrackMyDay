@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
-import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, Bell, ChevronLeft, Save, Users, User } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, Bell, ChevronLeft, Save, Users, User, GripVertical } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay } from 'date-fns';
 import type { TrackingReminder } from '../App';
 import ConfirmDialog from './ConfirmDialog';
@@ -307,6 +307,8 @@ const DEFAULT_TRACKING_CATEGORIES: TrackingCategory[] = [
 
 export default function Tracking({ activePerson, partner1Name, partner2Name, onAddReminder, accessToken, onUnsavedChanges }: Props) {
   const [categories, setCategories, saveCategories, hasUnsavedChanges] = useSupabasePersistedState<TrackingCategory[]>('tracking_categories', DEFAULT_TRACKING_CATEGORIES, DEFAULT_TRACKING_CATEGORIES, accessToken);
+  const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null);
+  const [canDragId, setCanDragId] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingColumn, setEditingColumn] = useState<{ categoryId: string; columnId: string } | null>(null);
@@ -478,12 +480,25 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
   // Entries visible per category: if category is shared, show all entries; otherwise show only owner's
   const filteredCategories = categories
     .filter((cat) => cat.person === activePerson || cat.person === 'both')
-    .map((cat) => ({
-      ...cat,
-      entries: cat.person === 'both'
+    .map((cat) => {
+      let entries = cat.person === 'both'
         ? cat.entries  // show all entries from both partners
-        : cat.entries.filter((e) => e.person === activePerson),
-    }));
+        : cat.entries.filter((e) => e.person === activePerson);
+
+      const dateCol = cat.columns.find((c) => c.type === 'date');
+      if (dateCol) {
+        entries = [...entries].sort((a, b) => {
+          const valA = a.data[dateCol.id] || '';
+          const valB = b.data[dateCol.id] || '';
+          return new Date(valB).getTime() - new Date(valA).getTime();
+        });
+      }
+
+      return {
+        ...cat,
+        entries,
+      };
+    });
 
   return (
     <div className="space-y-6">
@@ -531,23 +546,64 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
       {/* Categories list */}
       <div className="space-y-4">
         {filteredCategories.map((category) => (
-          <div key={category.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div
+            key={category.id}
+            draggable={canDragId === category.id}
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = 'move';
+              setDraggedCategoryId(category.id);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+            }}
+            onDrop={() => {
+              if (draggedCategoryId && draggedCategoryId !== category.id) {
+                const draggedIdx = categories.findIndex((c) => c.id === draggedCategoryId);
+                const targetIdx = categories.findIndex((c) => c.id === category.id);
+                if (draggedIdx !== -1 && targetIdx !== -1) {
+                  const newCats = [...categories];
+                  const [removed] = newCats.splice(draggedIdx, 1);
+                  newCats.splice(targetIdx, 0, removed);
+                  setCategories(newCats);
+                }
+              }
+              setDraggedCategoryId(null);
+              setCanDragId(null);
+            }}
+            onDragEnd={() => {
+              setDraggedCategoryId(null);
+              setCanDragId(null);
+            }}
+            className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-200 ${
+              draggedCategoryId === category.id ? 'opacity-40 border-dashed border-indigo-400' : ''
+            }`}
+          >
             {/* Category header */}
-            <div className="flex items-center justify-between px-5 py-4 bg-gray-50 border-b border-gray-200">
-              <button
-                onClick={() => toggleExpanded(category.id)}
-                className="flex items-center gap-2 text-gray-900 font-semibold hover:text-indigo-600 transition-colors"
-              >
-                {category.expanded ? (
-                  <ChevronDown className="w-5 h-5 text-gray-500" />
-                ) : (
-                  <ChevronRight className="w-5 h-5 text-gray-500" />
-                )}
-                <span>{category.name}</span>
-                <span className="text-xs text-gray-500 font-normal ml-1">
-                  ({category.entries.length} {category.entries.length === 1 ? 'entry' : 'entries'})
-                </span>
-              </button>
+            <div className="flex items-center justify-between px-5 py-4 bg-gray-50 border-b border-gray-200 group/header">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div
+                  onMouseDown={() => setCanDragId(category.id)}
+                  onMouseUp={() => setCanDragId(null)}
+                  className="opacity-0 group-hover/header:opacity-100 transition-opacity cursor-grab flex-shrink-0 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-200"
+                  title="Drag to reorder"
+                >
+                  <GripVertical className="w-4 h-4" />
+                </div>
+                <button
+                  onClick={() => toggleExpanded(category.id)}
+                  className="flex items-center gap-2 text-gray-900 font-semibold hover:text-indigo-600 transition-colors min-w-0"
+                >
+                  {category.expanded ? (
+                    <ChevronDown className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                  ) : (
+                    <ChevronRight className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                  )}
+                  <span className="truncate">{category.name}</span>
+                  <span className="text-xs text-gray-500 font-normal ml-1">
+                    ({category.entries.length} {category.entries.length === 1 ? 'entry' : 'entries'})
+                  </span>
+                </button>
+              </div>
               <div className="flex items-center gap-2">
                 {category.expanded && (
                   <>

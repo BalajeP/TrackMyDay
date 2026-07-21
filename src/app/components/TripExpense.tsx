@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
-import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical } from 'lucide-react';
 import { format } from 'date-fns';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -57,6 +57,9 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     DEFAULT_TRIP_STATE,
     accessToken
   );
+
+  const [draggedTripId, setDraggedTripId] = useState<string | null>(null);
+  const [canDragId, setCanDragId] = useState<string | null>(null);
 
   const [showAddColMenu, setShowAddColMenu] = useState<string | null>(null); // tripId
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null); // tripId
@@ -500,10 +503,23 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
   // Filter entries by spender
   const getFilteredEntries = useCallback((trip: Trip) => {
     const selectedSpender = spenderFilters[trip.id];
-    if (!selectedSpender || selectedSpender === 'all') return trip.entries;
-    const spenderCol = trip.columns.find((c) => c.id === 'spender');
-    if (!spenderCol) return trip.entries;
-    return trip.entries.filter((e) => e.data[spenderCol.id]?.trim() === selectedSpender);
+    let entries = trip.entries;
+    if (selectedSpender && selectedSpender !== 'all') {
+      const spenderCol = trip.columns.find((c) => c.id === 'spender');
+      if (spenderCol) {
+        entries = trip.entries.filter((e) => e.data[spenderCol.id]?.trim() === selectedSpender);
+      }
+    }
+
+    const dateCol = trip.columns.find((c) => c.type === 'date');
+    if (dateCol) {
+      return [...entries].sort((a, b) => {
+        const valA = a.data[dateCol.id] || '';
+        const valB = b.data[dateCol.id] || '';
+        return new Date(valB).getTime() - new Date(valA).getTime();
+      });
+    }
+    return entries;
   }, [spenderFilters]);
 
   // Calculations for dynamic totals (running on filtered entries)
@@ -697,11 +713,47 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
               return (
                 <div
                   key={trip.id}
-                  className="border border-gray-200 rounded-2xl shadow-sm overflow-hidden bg-white transition-all duration-200"
+                  draggable={canDragId === trip.id}
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = 'move';
+                    setDraggedTripId(trip.id);
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                  }}
+                  onDrop={() => {
+                    if (draggedTripId && draggedTripId !== trip.id) {
+                      const draggedIdx = activeState.trips.findIndex((t) => t.id === draggedTripId);
+                      const targetIdx = activeState.trips.findIndex((t) => t.id === trip.id);
+                      if (draggedIdx !== -1 && targetIdx !== -1) {
+                        const newTrips = [...activeState.trips];
+                        const [removed] = newTrips.splice(draggedIdx, 1);
+                        newTrips.splice(targetIdx, 0, removed);
+                        setState((prev) => ({ ...prev, trips: newTrips }));
+                      }
+                    }
+                    setDraggedTripId(null);
+                    setCanDragId(null);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedTripId(null);
+                    setCanDragId(null);
+                  }}
+                  className={`border border-gray-200 rounded-2xl shadow-sm overflow-hidden bg-white transition-all duration-200 ${
+                    draggedTripId === trip.id ? 'opacity-40 border-dashed border-indigo-400' : ''
+                  }`}
                 >
                   {/* Trip Card Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-4 bg-gray-50/70 border-b border-gray-200 gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-4 bg-gray-50/70 border-b border-gray-200 gap-3 group/header">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div
+                        onMouseDown={() => setCanDragId(trip.id)}
+                        onMouseUp={() => setCanDragId(null)}
+                        className="opacity-0 group-hover/header:opacity-100 transition-opacity cursor-grab flex-shrink-0 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-200"
+                        title="Drag to reorder"
+                      >
+                        <GripVertical className="w-4 h-4" />
+                      </div>
                       <button
                         onClick={() => toggleTripExpanded(trip.id)}
                         className="p-1 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors cursor-pointer"

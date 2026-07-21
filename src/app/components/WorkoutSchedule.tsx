@@ -251,10 +251,21 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
   };
 
   // Filter by active person
-  const filteredCategories = categories.map((cat) => ({
-    ...cat,
-    entries: cat.entries.filter((entry) => entry.person === activePerson),
-  }));
+  const filteredCategories = categories.map((cat) => {
+    let entries = cat.entries.filter((entry) => entry.person === activePerson);
+    const dateCol = cat.columns.find((c) => c.type === 'date');
+    if (dateCol) {
+      entries = [...entries].sort((a, b) => {
+        const valA = a.data[dateCol.id] || '';
+        const valB = b.data[dateCol.id] || '';
+        return new Date(valB).getTime() - new Date(valA).getTime();
+      });
+    }
+    return {
+      ...cat,
+      entries,
+    };
+  });
 
   // Calculate timeframe interval
   const getTimeInterval = () => {

@@ -173,9 +173,9 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
 }
 
 // ── Cell meal dropdown (portal) ───────────────────────────────────────────────
-function MealDropdown({ value, options, placeholder, onChange, onAddOption }: {
+function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDeleteOption }: {
   value: string; options: string[]; placeholder?: string;
-  onChange: (v: string) => void; onAddOption: (v: string) => void;
+  onChange: (v: string) => void; onAddOption: (v: string) => void; onDeleteOption?: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [newItem, setNewItem] = useState('');
@@ -234,17 +234,35 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption }: {
               <p className="px-3 py-3 text-xs text-gray-400 italic text-center">No items — add below</p>
             )}
             {options.map((opt) => (
-              <button
+              <div
                 key={opt}
-                onClick={() => { onChange(opt); setOpen(false); }}
-                className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors group ${
                   opt === value
                     ? 'bg-indigo-50 text-indigo-700 font-medium'
                     : 'text-gray-700 hover:bg-indigo-50 hover:text-indigo-700'
                 }`}
               >
-                {opt}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => { onChange(opt); setOpen(false); }}
+                  className="flex-1 text-left truncate pr-2 py-0.5"
+                >
+                  {opt}
+                </button>
+                {onDeleteOption && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteOption(opt);
+                    }}
+                    className="flex-shrink-0 p-1 text-gray-400 hover:text-red-600 rounded hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100"
+                    title={`Delete ${opt}`}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
           <div className="border-t border-gray-100 p-2 flex gap-1.5 bg-gray-50">
@@ -272,9 +290,9 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption }: {
 }
 
 // ── Meal cell ─────────────────────────────────────────────────────────────────
-function MealCell({ entry, options, onAddOption, onChange }: {
+function MealCell({ entry, options, onAddOption, onDeleteOption, onChange }: {
   entry: MealEntry; options: string[];
-  onAddOption: (v: string) => void; onChange: (e: MealEntry) => void;
+  onAddOption: (v: string) => void; onDeleteOption: (v: string) => void; onChange: (e: MealEntry) => void;
 }) {
   const setStatus = (s: MealStatus) =>
     onChange({ ...entry, status: s === entry.status ? 'planned' : s, actual: s === 'changed' ? entry.actual : undefined });
@@ -285,6 +303,7 @@ function MealCell({ entry, options, onAddOption, onChange }: {
         value={entry.planned} options={options} placeholder="— none —"
         onChange={(v) => onChange({ ...entry, planned: v, status: 'planned', actual: undefined })}
         onAddOption={onAddOption}
+        onDeleteOption={onDeleteOption}
       />
 
       {entry.planned && (
@@ -325,6 +344,7 @@ function MealCell({ entry, options, onAddOption, onChange }: {
               value={entry.actual || ''} options={options} placeholder="What did you have?"
               onChange={(v) => onChange({ ...entry, actual: v })}
               onAddOption={onAddOption}
+              onDeleteOption={onDeleteOption}
             />
           )}
         </>
@@ -472,6 +492,7 @@ export default function MealSchedule({ activePerson, partner1Name, partner2Name,
                           entry={getEntry(dateStr, col.key)}
                           options={optionsByMeal[col.key]}
                           onAddOption={(v) => addOption(col.key, v)}
+                          onDeleteOption={(v) => deleteOption(col.key, v)}
                           onChange={(e) => setEntry(dateStr, col.key, e)}
                         />
                       </td>
