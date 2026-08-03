@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
 import { createPortal } from 'react-dom';
-import { Check, Pencil, UtensilsCrossed, Plus, X, ChevronDown, ChevronLeft, ChevronRight, List, Trash2, Save } from 'lucide-react';
+import { Check, Pencil, UtensilsCrossed, Plus, X, ChevronDown, ChevronLeft, ChevronRight, List, Trash2, Save, Search } from 'lucide-react';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isToday } from 'date-fns';
 
 type Person = 'partner1' | 'partner2' | 'both';
@@ -78,13 +78,18 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
 }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const pos = usePortalPosition(btnRef, open);
   const styles = COL_STYLES[color];
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setInput('');
+      setSearchQuery('');
+      return;
+    }
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
       if (btnRef.current?.contains(target) || panelRef.current?.contains(target)) return;
@@ -98,6 +103,10 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
     const t = input.trim();
     if (t && !options.includes(t)) { onAdd(t); setInput(''); }
   };
+
+  const filteredOptions = options.filter((opt) =>
+    opt.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  );
 
   return (
     <>
@@ -128,6 +137,28 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
             </button>
           </div>
 
+          {/* Search bar */}
+          <div className="p-2 border-b border-gray-100 bg-gray-50/50">
+            <div className="relative flex items-center">
+              <Search className="w-3.5 h-3.5 absolute left-2 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search options…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-7 pr-6 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 text-gray-400 hover:text-gray-600 p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Add input */}
           <div className="p-2 border-b border-gray-100 flex gap-1.5">
             <input
@@ -136,7 +167,6 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-              autoFocus
               className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
             />
             <button
@@ -150,10 +180,12 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
 
           {/* List */}
           <div className="max-h-52 overflow-y-auto">
-            {options.length === 0 && (
-              <p className="px-3 py-4 text-xs text-gray-400 italic text-center">No items yet</p>
+            {filteredOptions.length === 0 && (
+              <p className="px-3 py-4 text-xs text-gray-400 italic text-center">
+                {options.length === 0 ? 'No items yet' : 'No matching items'}
+              </p>
             )}
-            {options.map((opt) => (
+            {filteredOptions.map((opt) => (
               <div key={opt} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 group">
                 <span className="text-xs text-gray-700 flex-1 min-w-0 truncate" title={opt}>{opt}</span>
                 <button
@@ -179,12 +211,17 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
 }) {
   const [open, setOpen] = useState(false);
   const [newItem, setNewItem] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const pos = usePortalPosition(btnRef, open);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setNewItem('');
+      setSearchQuery('');
+      return;
+    }
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
       if (btnRef.current?.contains(target) || panelRef.current?.contains(target)) return;
@@ -198,6 +235,10 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
     const t = newItem.trim();
     if (t && !options.includes(t)) { onAddOption(t); onChange(t); setNewItem(''); setOpen(false); }
   };
+
+  const filteredOptions = options.filter((opt) =>
+    opt.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  );
 
   return (
     <>
@@ -218,11 +259,34 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
       {open && createPortal(
         <div
           ref={panelRef}
-          style={{ position: 'fixed', top: pos.top, left: pos.left, width: 200, zIndex: 9999 }}
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: 220, zIndex: 9999 }}
           className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
         >
+          {/* Search bar */}
+          <div className="p-2 border-b border-gray-100 bg-gray-50/50">
+            <div className="relative flex items-center">
+              <Search className="w-3.5 h-3.5 absolute left-2 text-gray-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search menu items…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                autoFocus
+                className="w-full pl-7 pr-6 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 text-gray-400 hover:text-gray-600 p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="max-h-48 overflow-y-auto">
-            {value && (
+            {value && !searchQuery && (
               <button
                 onClick={() => { onChange(''); setOpen(false); }}
                 className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1"
@@ -230,10 +294,12 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
                 <X className="w-3 h-3" /> Clear
               </button>
             )}
-            {options.length === 0 && (
-              <p className="px-3 py-3 text-xs text-gray-400 italic text-center">No items — add below</p>
+            {filteredOptions.length === 0 && (
+              <p className="px-3 py-3 text-xs text-gray-400 italic text-center">
+                {options.length === 0 ? 'No items — add below' : 'No matching items'}
+              </p>
             )}
-            {options.map((opt) => (
+            {filteredOptions.map((opt) => (
               <div
                 key={opt}
                 className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors group ${
