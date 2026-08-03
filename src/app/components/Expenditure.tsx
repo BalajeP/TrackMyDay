@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { Plus,
+import {
+  Plus,
   Trash2,
   Save,
   Receipt,
@@ -12,7 +13,12 @@ import { Plus,
   Tag,
   Filter,
   ChevronDown,
-  PieChart, AlertTriangle,
+  ChevronUp,
+  PieChart,
+  AlertTriangle,
+  FileText,
+  Printer,
+  Download,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
@@ -183,10 +189,13 @@ export default function Expenditure({
   // Selected Expense Detail Card ID for Modal View
   const [selectedExpenseDetailId, setSelectedExpenseDetailId] = useState<string | null>(null);
 
-  // In-Modal Confirmation State (Prompts inside detailed view itself)
+  // In-Modal Confirmation State
   const [confirmCardDeleteInModal, setConfirmCardDeleteInModal] = useState<boolean>(false);
   const [confirmColumnDeleteInModal, setConfirmColumnDeleteInModal] = useState<string | null>(null);
   const [confirmItemDeleteInModal, setConfirmItemDeleteInModal] = useState<string | null>(null);
+
+  // PDF Report Generation Modal Preview State
+  const [showPdfPreviewModal, setShowPdfPreviewModal] = useState<boolean>(false);
 
   // Dynamic Column Addition State for Modal View
   const [showAddColumnModal, setShowAddColumnModal] = useState<boolean>(false);
@@ -677,6 +686,19 @@ export default function Expenditure({
     return expenses.find((e) => e.id === selectedExpenseDetailId) || null;
   }, [expenses, selectedExpenseDetailId]);
 
+  // Handle PDF Export / Print Trigger
+  const handlePrintPdf = () => {
+    window.print();
+  };
+
+  const activePeriodLabel = useMemo(() => {
+    if (dateFilterType === 'today') return `Today (${format(new Date(), 'dd MMM yyyy')})`;
+    if (dateFilterType === 'this_week') return 'This Week';
+    if (dateFilterType === 'this_month') return `This Month (${format(new Date(), 'MMMM yyyy')})`;
+    if (dateFilterType === 'this_year') return `This Year (${format(new Date(), 'yyyy')})`;
+    return `Custom Period (${MONTHS.find((m) => m.value === selectedMonth)?.label} ${selectedYear})`;
+  }, [dateFilterType, selectedMonth, selectedYear]);
+
   return (
     <div className="space-y-6">
       {/* Top Sub-Tab Switcher Component */}
@@ -706,6 +728,7 @@ export default function Expenditure({
           </button>
         </div>
 
+        {/* Save Button */}
         <button
           onClick={handleSave}
           disabled={!hasUnsavedChanges}
@@ -925,7 +948,7 @@ export default function Expenditure({
                                     className="p-1 text-gray-400 hover:bg-gray-100 rounded"
                                     title="Cancel edit"
                                   >
-                                    <X className="w-3.5 h-3.5" />
+                                    <X className="w-3 h-3" />
                                   </button>
                                 </div>
                               ) : (
@@ -1030,8 +1053,18 @@ export default function Expenditure({
 
         {/* SIDE-BY-SIDE ROW: Donut SVG Chart Dashboard on Left & Add Expense Card Button on Right */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
-          {/* Dashboard Circle Chart Panel (3 cols) */}
+          {/* Dashboard Circle Chart Panel (3 cols) with PDF Export Button in TOP RIGHT CORNER */}
           <div className="lg:col-span-3 bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6 relative">
+            {/* PDF Export Button positioned cleanly in the Top Right Corner */}
+            <button
+              onClick={() => setShowPdfPreviewModal(true)}
+              className="absolute top-3.5 right-3.5 z-10 p-1.5 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
+              title="Generate PDF Report"
+            >
+              <FileText className="w-3.5 h-3.5 text-red-600" />
+              <span>PDF</span>
+            </button>
+
             {/* Donut Chart SVG */}
             <div className="relative flex items-center justify-center flex-shrink-0">
               <svg width="170" height="170" viewBox="0 0 170 170" className="transform -rotate-90">
@@ -1089,12 +1122,13 @@ export default function Expenditure({
             </div>
 
             {/* Chart Legend with Hover Tooltips */}
-            <div className="flex-1 w-full min-w-0">
+            <div className="flex-1 w-full min-w-0 pr-12 sm:pr-14">
               <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
                 <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
                   <PieChart className="w-4 h-4 text-indigo-600" />
                   <span>Category Expenses Breakdown</span>
                 </h4>
+
                 <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                   ${totalSpentAll.toFixed(2)}
                 </span>
@@ -1790,6 +1824,213 @@ export default function Expenditure({
               <span className="text-lg font-extrabold text-indigo-600">
                 ${getExpenseTotal(activeDetailExpense).toFixed(2)}
               </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full PDF Report Document Preview & Print Modal */}
+      {showPdfPreviewModal && (
+        <div className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-md flex flex-col items-center justify-start p-4 overflow-y-auto print:p-0 print:bg-white print:static">
+          {/* Action Control Bar (Hidden when printing) */}
+          <div className="w-full max-w-4xl bg-gray-900 text-white rounded-2xl p-4 mb-4 flex items-center justify-between shadow-2xl print:hidden sticky top-2 z-50">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+                <FileText className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold">Expenditure PDF Report Preview</h3>
+                <span className="text-xs text-gray-400">
+                  {activePeriodLabel} • Overall Dashboard & Expanded Cards
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handlePrintPdf}
+                className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Print / Save as PDF</span>
+              </button>
+              <button
+                onClick={() => setShowPdfPreviewModal(false)}
+                className="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-gray-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Printable Report Document Container */}
+          <div className="w-full max-w-4xl bg-white rounded-2xl border border-gray-200 p-8 shadow-2xl space-y-8 print:shadow-none print:border-none print:p-0 print:w-full text-gray-900">
+            {/* Report Document Header */}
+            <div className="border-b-2 border-indigo-600 pb-6 flex items-start justify-between">
+              <div>
+                <h1 className="text-2xl font-black tracking-tight text-indigo-950 uppercase">
+                  TrackMyDay Expenditure Report
+                </h1>
+                <p className="text-xs text-gray-500 font-semibold mt-1">
+                  Period: <span className="text-indigo-600 font-bold">{activePeriodLabel}</span>
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Partner Profile:{' '}
+                  <span className="font-semibold text-gray-700 capitalize">{activePerson}</span>
+                </p>
+              </div>
+              <div className="text-right">
+                <span className="text-xs text-gray-400 block font-semibold">Report Date</span>
+                <span className="text-sm font-bold text-gray-800">
+                  {format(new Date(), 'dd MMMM yyyy')}
+                </span>
+                <span className="text-[10px] text-gray-400 block mt-1">
+                  Generated from TrackMyDay App
+                </span>
+              </div>
+            </div>
+
+            {/* SECTION 1: Overall Dashboard & Breakdown Table */}
+            <div className="space-y-4">
+              <h2 className="text-sm font-extrabold text-gray-800 uppercase tracking-wider flex items-center gap-2 border-b border-gray-200 pb-2">
+                <PieChart className="w-4 h-4 text-indigo-600" />
+                <span>1. Overall Dashboard Summary</span>
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-indigo-50/70 border border-indigo-100 p-4 rounded-xl text-center">
+                  <span className="text-xs text-gray-500 font-bold uppercase block">Total Spent</span>
+                  <span className="text-2xl font-black text-indigo-600 mt-1 block">
+                    ${totalSpentAll.toFixed(2)}
+                  </span>
+                </div>
+                <div className="bg-purple-50/70 border border-purple-100 p-4 rounded-xl text-center">
+                  <span className="text-xs text-gray-500 font-bold uppercase block">Total Cards</span>
+                  <span className="text-2xl font-black text-purple-600 mt-1 block">
+                    {filteredExpenses.length}
+                  </span>
+                </div>
+                <div className="bg-emerald-50/70 border border-emerald-100 p-4 rounded-xl text-center">
+                  <span className="text-xs text-gray-500 font-bold uppercase block">Category Count</span>
+                  <span className="text-2xl font-black text-emerald-600 mt-1 block">
+                    {Object.keys(categoryTotals).length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Category Breakdown Table */}
+              <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-gray-100 text-gray-600 font-bold uppercase">
+                    <tr>
+                      <th className="py-2.5 px-4">Category</th>
+                      <th className="py-2.5 px-4 text-right">Amount ($)</th>
+                      <th className="py-2.5 px-4 text-right">% Breakdown</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {Object.entries(categoryTotals).map(([cat, amt]) => {
+                      const pct = totalSpentAll > 0 ? (amt / totalSpentAll) * 100 : 0;
+                      return (
+                        <tr key={cat}>
+                          <td className="py-2 px-4 font-semibold text-gray-800">{cat}</td>
+                          <td className="py-2 px-4 text-right font-bold text-gray-900">
+                            ${amt.toFixed(2)}
+                          </td>
+                          <td className="py-2 px-4 text-right text-gray-500">{pct.toFixed(1)}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* SECTION 2: Expanded Cards & Itemized Tables */}
+            <div className="space-y-6">
+              <h2 className="text-sm font-extrabold text-gray-800 uppercase tracking-wider flex items-center gap-2 border-b border-gray-200 pb-2">
+                <Receipt className="w-4 h-4 text-indigo-600" />
+                <span>2. Expanded Expense Cards & Detail Entries</span>
+              </h2>
+
+              {filteredExpenses.length === 0 ? (
+                <p className="text-xs text-gray-400 italic text-center py-4">
+                  No expense cards recorded for this period.
+                </p>
+              ) : (
+                filteredExpenses.map((exp) => {
+                  const items = getExpenseFilteredItems(exp);
+                  const cardTotal = getExpenseTotal(exp);
+
+                  return (
+                    <div key={exp.id} className="border border-gray-200 rounded-xl overflow-hidden space-y-2 p-4 page-break-inside-avoid">
+                      {/* Card Header */}
+                      <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{exp.icon || '🍔'}</span>
+                          <h3 className="font-bold text-sm text-gray-900">{exp.description}</h3>
+                          <span className="text-xs text-gray-400">({items.length} entries)</span>
+                        </div>
+                        <span className="text-sm font-extrabold text-indigo-600">
+                          ${cardTotal.toFixed(2)}
+                        </span>
+                      </div>
+
+                      {/* Itemized Table */}
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-200 text-gray-400 font-semibold uppercase">
+                            <th className="py-1.5 px-2">Date</th>
+                            <th className="py-1.5 px-2">Detail</th>
+                            {(exp.customColumns || []).map((col) => (
+                              <th key={col} className="py-1.5 px-2">
+                                {col}
+                              </th>
+                            ))}
+                            <th className="py-1.5 px-2 text-right">Amount ($)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {items.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={3 + (exp.customColumns || []).length}
+                                className="py-3 text-center text-gray-400 italic"
+                              >
+                                No entries recorded
+                              </td>
+                            </tr>
+                          ) : (
+                            items.map((item) => (
+                              <tr key={item.id}>
+                                <td className="py-2 px-2 text-gray-500">
+                                  {item.date ? format(parseISO(item.date), 'dd MMM yyyy') : '-'}
+                                </td>
+                                <td className="py-2 px-2 font-semibold text-gray-800">
+                                  {item.item}
+                                </td>
+                                {(exp.customColumns || []).map((col) => (
+                                  <td key={col} className="py-2 px-2 text-gray-600">
+                                    {item.customValues?.[col] || '-'}
+                                  </td>
+                                ))}
+                                <td className="py-2 px-2 text-right font-bold text-gray-900">
+                                  ${item.amount.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-gray-200 pt-4 text-center text-[11px] text-gray-400">
+              End of TrackMyDay Expenditure Report • Generated on {format(new Date(), 'dd MMM yyyy HH:mm')}
             </div>
           </div>
         </div>
