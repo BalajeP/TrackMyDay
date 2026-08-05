@@ -29,6 +29,7 @@ import { format, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date
 type Person = 'partner1' | 'partner2' | 'both';
 type ExpenseTab = 'daily' | 'trip';
 type DateFilterType = 'today' | 'this_week' | 'this_month' | 'this_year' | 'custom';
+type CardSortOption = 'custom' | 'a-z' | 'z-a' | 'amount-desc' | 'amount-asc';
 
 export interface ExpenseItem {
   id: string;
@@ -230,6 +231,9 @@ export default function Expenditure({
   const [draggedExpenseId, setDraggedExpenseId] = useState<string | null>(null);
   const [canDragExpenseId, setCanDragExpenseId] = useState<string | null>(null);
 
+  // Expense Card Sorting State (a-z, z-a, amount-desc, amount-asc, custom)
+  const [cardSortOption, setCardSortOption] = useState<CardSortOption>('custom');
+
   // Expense Card Title & Icon Editing State
   const [editingExpense, setEditingExpense] = useState<{
     id: string;
@@ -360,6 +364,24 @@ export default function Expenditure({
     },
     [isDateMatchPeriod]
   );
+
+  // Sorted Filtered Expenses Cards (A-Z, Z-A, High to Low spend, Low to High spend)
+  const sortedFilteredExpenses = useMemo(() => {
+    const list = [...filteredExpenses];
+    if (cardSortOption === 'a-z') {
+      return list.sort((a, b) => a.description.localeCompare(b.description));
+    }
+    if (cardSortOption === 'z-a') {
+      return list.sort((a, b) => b.description.localeCompare(a.description));
+    }
+    if (cardSortOption === 'amount-desc') {
+      return list.sort((a, b) => getExpenseTotal(b) - getExpenseTotal(a));
+    }
+    if (cardSortOption === 'amount-asc') {
+      return list.sort((a, b) => getExpenseTotal(a) - getExpenseTotal(b));
+    }
+    return list;
+  }, [filteredExpenses, cardSortOption, getExpenseTotal]);
 
   // Helper to get filtered items for an expense
   const getExpenseFilteredItems = useCallback(
@@ -1239,22 +1261,44 @@ export default function Expenditure({
 
         {/* Overview Box Grid Section: Saved Expense Cards (4 in a row) */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide flex items-center gap-2">
               <Receipt className="w-4 h-4 text-indigo-600" />
-              <span>Expense Cards ({filteredExpenses.length})</span>
+              <span>Expense Cards ({sortedFilteredExpenses.length})</span>
             </h3>
-            {selectedCategories.length > 0 && (
-              <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium border border-indigo-100">
-                Filtered: {selectedCategories.join(', ')}
-              </span>
-            )}
+
+            {/* Sorting Dropdown Control Bar */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-2xs">
+                <span className="text-xs font-bold text-gray-600 flex items-center gap-1">
+                  <Filter className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Sort Cards:</span>
+                </span>
+                <select
+                  value={cardSortOption}
+                  onChange={(e) => setCardSortOption(e.target.value as CardSortOption)}
+                  className="text-xs font-bold text-indigo-900 bg-transparent focus:outline-none cursor-pointer"
+                >
+                  <option value="custom">Default / Custom Drag Order</option>
+                  <option value="a-z">A to Z (Name)</option>
+                  <option value="z-a">Z to A (Name)</option>
+                  <option value="amount-desc">High Money Spent → Low Money Spent</option>
+                  <option value="amount-asc">Low Money Spent → High Money Spent</option>
+                </select>
+              </div>
+
+              {selectedCategories.length > 0 && (
+                <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-xl font-semibold border border-indigo-100">
+                  Filtered: {selectedCategories.join(', ')}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Grid Layout: 4 Cards per row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Saved Expense Box Cards with Drag & Drop Reordering and Title/Icon Editing */}
-            {filteredExpenses
+            {/* Saved Expense Box Cards with Drag & Drop Reordering, Sorting, and Title/Icon Editing */}
+            {sortedFilteredExpenses
               .map((expense) => {
                 const totalSpent = getExpenseTotal(expense);
                 const isDragging = draggedExpenseId === expense.id;
