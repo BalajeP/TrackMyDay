@@ -5,7 +5,6 @@ import DailyActivities from './components/DailyActivities';
 import MealSchedule from './components/MealSchedule';
 import WorkoutSchedule from './components/WorkoutSchedule';
 import Expenditure from './components/Expenditure';
-import SavingsGoals from './components/SavingsGoals';
 import CalendarView from './components/CalendarView';
 import Tracking from './components/Tracking';
 import AuthPage from './components/AuthPage';
@@ -14,7 +13,7 @@ import { useAuth } from './hooks/useAuth';
 import { useSupabasePersistedState } from './hooks/useSupabasePersistedState';
 import { usePWA } from './hooks/usePWA';
 
-type Tab = 'activities' | 'meals' | 'workout' | 'expenses' | 'savings' | 'calendar' | 'tracking';
+type Tab = 'activities' | 'meals' | 'workout' | 'expenses' | 'calendar' | 'tracking';
 type Person = 'partner1' | 'partner2' | 'both';
 type AvatarType = 'letter' | 'emoji' | 'photo';
 
@@ -252,7 +251,6 @@ export default function App() {
     { id: 'meals' as Tab, label: 'Meals', icon: Utensils },
     { id: 'workout' as Tab, label: 'Workout', icon: Dumbbell },
     { id: 'expenses' as Tab, label: 'Expenses', icon: DollarSign },
-    { id: 'savings' as Tab, label: 'Goals', icon: Target },
     { id: 'calendar' as Tab, label: 'Calendar', icon: Calendar },
   ];
 
@@ -334,7 +332,6 @@ export default function App() {
         {activeTab === 'meals'      && <MealSchedule {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
         {activeTab === 'workout'    && <WorkoutSchedule {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
         {activeTab === 'expenses'   && <Expenditure {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
-        {activeTab === 'savings'    && <SavingsGoals {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
         {activeTab === 'calendar'   && <CalendarView {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
         {activeTab === 'tracking'   && <Tracking {...sharedProps} reminders={trackingReminders} onAddReminder={addTrackingReminder} onUpdateReminders={updateTrackingReminders} onUnsavedChanges={handleUnsavedChanges} />}
       </main>

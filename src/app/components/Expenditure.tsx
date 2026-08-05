@@ -19,6 +19,7 @@ import {
   FileText,
   Printer,
   Download,
+  GripVertical,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
@@ -224,6 +225,19 @@ export default function Expenditure({
     amount: string;
     customValues: Record<string, string>;
   } | null>(null);
+
+  // Drag & Drop Reordering State
+  const [draggedExpenseId, setDraggedExpenseId] = useState<string | null>(null);
+  const [canDragExpenseId, setCanDragExpenseId] = useState<string | null>(null);
+
+  // Expense Card Title & Icon Editing State
+  const [editingExpense, setEditingExpense] = useState<{
+    id: string;
+    description: string;
+    icon: string;
+  } | null>(null);
+  const [showEditIconPicker, setShowEditIconPicker] = useState<boolean>(false);
+  const [editEmojiTab, setEditEmojiTab] = useState<number>(0);
 
   // Click Outside Listener for Category Dropdown
   useEffect(() => {
@@ -678,6 +692,36 @@ export default function Expenditure({
         }
       },
     });
+  };
+
+  // Expense Title & Icon Editing Handlers
+  const handleStartEditExpense = (expense: Expense) => {
+    setEditingExpense({
+      id: expense.id,
+      description: expense.description,
+      icon: expense.icon || '🍔',
+    });
+    setShowEditIconPicker(false);
+  };
+
+  const handleSaveEditExpense = () => {
+    if (!editingExpense) return;
+    const trimmed = editingExpense.description.trim();
+    if (!trimmed) return;
+
+    setExpenses(
+      expenses.map((e) =>
+        e.id === editingExpense.id
+          ? {
+              ...e,
+              description: trimmed,
+              icon: editingExpense.icon || '🍔',
+            }
+          : e
+      )
+    );
+    setEditingExpense(null);
+    setShowEditIconPicker(false);
   };
 
   // Find currently active detail card object for Modal
@@ -1209,55 +1253,214 @@ export default function Expenditure({
 
           {/* Grid Layout: 4 Cards per row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Saved Expense Box Cards of Same Size (Shows Icon, Title, Amount alone. On click opens detail view modal matching screenshot!) */}
+            {/* Saved Expense Box Cards with Drag & Drop Reordering and Title/Icon Editing */}
             {filteredExpenses
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .map((expense) => {
                 const totalSpent = getExpenseTotal(expense);
+                const isDragging = draggedExpenseId === expense.id;
+                const isEditingThisCard = editingExpense?.id === expense.id;
+
                 return (
                   <div
                     key={expense.id}
-                    onClick={() => {
-                      setSelectedExpenseDetailId(expense.id);
-                      setConfirmCardDeleteInModal(false);
-                      setConfirmColumnDeleteInModal(null);
-                      setConfirmItemDeleteInModal(null);
+                    draggable={canDragExpenseId === expense.id}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = 'move';
+                      setDraggedExpenseId(expense.id);
                     }}
-                    className="h-44 bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-lg hover:border-indigo-400 transition-all flex flex-col items-center justify-between text-center relative group cursor-pointer"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                    }}
+                    onDrop={() => {
+                      if (draggedExpenseId && draggedExpenseId !== expense.id) {
+                        const draggedIdx = expenses.findIndex((e) => e.id === draggedExpenseId);
+                        const targetIdx = expenses.findIndex((e) => e.id === expense.id);
+                        if (draggedIdx !== -1 && targetIdx !== -1) {
+                          const newExpenses = [...expenses];
+                          const [removed] = newExpenses.splice(draggedIdx, 1);
+                          newExpenses.splice(targetIdx, 0, removed);
+                          setExpenses(newExpenses);
+                        }
+                      }
+                      setDraggedExpenseId(null);
+                      setCanDragExpenseId(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedExpenseId(null);
+                      setCanDragExpenseId(null);
+                    }}
+                    onClick={() => {
+                      if (!isEditingThisCard) {
+                        setSelectedExpenseDetailId(expense.id);
+                        setConfirmCardDeleteInModal(false);
+                        setConfirmColumnDeleteInModal(null);
+                        setConfirmItemDeleteInModal(null);
+                      }
+                    }}
+                    className={`min-h-[176px] bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-lg hover:border-indigo-400 transition-all flex flex-col items-center justify-between text-center relative group ${
+                      isDragging ? 'opacity-40 border-dashed border-indigo-400' : ''
+                    } ${isEditingThisCard ? 'ring-2 ring-indigo-500 border-indigo-500 z-20' : 'cursor-pointer'}`}
                   >
-                    {/* Delete card button top right (prompts confirmation) */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        promptOutsideDeleteExpense(expense);
-                      }}
-                      className="absolute top-2.5 right-2.5 p-1.5 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                      title="Delete card"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-
-                    {/* Icon */}
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl shadow-xs mt-1 group-hover:scale-105 transition-transform">
-                      {expense.icon || '🍔'}
-                    </div>
-
-                    {/* Title & Amount alone */}
-                    <div className="w-full px-1">
-                      <h4
-                        className="font-bold text-gray-900 text-sm truncate"
-                        title={expense.description}
+                    {/* Top Action Bar: Drag Grip (Left) & Edit / Delete Buttons (Right) */}
+                    <div className="w-full flex items-center justify-between z-10 min-h-[24px]">
+                      <div
+                        onMouseDown={() => setCanDragExpenseId(expense.id)}
+                        onMouseUp={() => setCanDragExpenseId(null)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity cursor-grab text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100"
+                        title="Drag to reorder"
                       >
-                        {expense.description}
-                      </h4>
-                      <span className="text-base font-extrabold text-indigo-600 block mt-0.5">
-                        ${totalSpent.toFixed(2)}
-                      </span>
+                        <GripVertical className="w-4 h-4" />
+                      </div>
+
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartEditExpense(expense);
+                          }}
+                          className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                          title="Edit title & icon"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            promptOutsideDeleteExpense(expense);
+                          }}
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Delete card"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
-                    <span className="text-[10px] text-indigo-500 font-semibold group-hover:underline opacity-80">
-                      Click for details →
-                    </span>
+                    {/* Card Body: Edit Mode vs Normal View */}
+                    {isEditingThisCard ? (
+                      <div
+                        className="w-full space-y-2 py-1 z-20"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {/* Icon selector button */}
+                        <div className="relative flex justify-center">
+                          <button
+                            type="button"
+                            onClick={() => setShowEditIconPicker((v) => !v)}
+                            className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-xl hover:bg-indigo-100 transition-colors shadow-xs"
+                            title="Change icon"
+                          >
+                            {editingExpense.icon || '🍔'}
+                          </button>
+
+                          {/* Emoji Picker Popover */}
+                          {showEditIconPicker && (
+                            <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 w-64 bg-white border border-gray-200 rounded-xl shadow-2xl p-3 space-y-2 text-left">
+                              <div className="flex items-center justify-between text-xs font-bold text-gray-700 border-b border-gray-100 pb-1.5">
+                                <span>Choose Icon</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowEditIconPicker(false)}
+                                  className="text-gray-400 hover:text-gray-600 p-0.5"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                              <div className="flex items-center gap-1 border-b border-gray-100 pb-1.5 overflow-x-auto">
+                                {EMOJI_CATEGORIES.map((cat, idx) => (
+                                  <button
+                                    key={cat.name}
+                                    type="button"
+                                    onClick={() => setEditEmojiTab(idx)}
+                                    className={`px-2 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap transition-colors ${
+                                      editEmojiTab === idx
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                                  >
+                                    {cat.icon}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="grid grid-cols-5 gap-1 max-h-36 overflow-y-auto p-1">
+                                {EMOJI_CATEGORIES[editEmojiTab].emojis.map((emoji) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingExpense({ ...editingExpense, icon: emoji });
+                                      setShowEditIconPicker(false);
+                                    }}
+                                    className={`h-8 text-base rounded-lg flex items-center justify-center transition-transform hover:scale-110 ${
+                                      editingExpense.icon === emoji
+                                        ? 'bg-indigo-600 text-white shadow-xs'
+                                        : 'hover:bg-indigo-50'
+                                    }`}
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Title input */}
+                        <input
+                          type="text"
+                          value={editingExpense.description}
+                          onChange={(e) =>
+                            setEditingExpense({ ...editingExpense, description: e.target.value })
+                          }
+                          onKeyDown={(e) => e.key === 'Enter' && handleSaveEditExpense()}
+                          autoFocus
+                          className="w-full px-2 py-1 text-xs border border-indigo-300 rounded-lg text-center font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                        />
+
+                        {/* Save & Cancel buttons */}
+                        <div className="flex items-center justify-center gap-1.5 pt-0.5">
+                          <button
+                            type="button"
+                            onClick={handleSaveEditExpense}
+                            className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg text-[11px] font-bold shadow-2xs flex items-center gap-1"
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>Save</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingExpense(null)}
+                            className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[11px] font-semibold"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Icon */}
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl shadow-xs group-hover:scale-105 transition-transform my-1">
+                          {expense.icon || '🍔'}
+                        </div>
+
+                        {/* Title & Amount alone */}
+                        <div className="w-full px-1">
+                          <h4
+                            className="font-bold text-gray-900 text-sm truncate"
+                            title={expense.description}
+                          >
+                            {expense.description}
+                          </h4>
+                          <span className="text-base font-extrabold text-indigo-600 block mt-0.5">
+                            ${totalSpent.toFixed(2)}
+                          </span>
+                        </div>
+
+                        <span className="text-[10px] text-indigo-500 font-semibold group-hover:underline opacity-80 mb-1">
+                          Click for details →
+                        </span>
+                      </>
+                    )}
                   </div>
                 );
               })}
@@ -1282,18 +1485,123 @@ export default function Expenditure({
           <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             {/* Screenshot Header Bar: Chevron ∨ | Icon + Title + (X entries) | + Add Entry | + Add Column | Trash Icon | Close X */}
             <div className="p-4 bg-white border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
-              {/* Left Side: Chevron + Icon + Title + (X entries) */}
-              <div className="flex items-center gap-2.5">
-                <ChevronDown className="w-4 h-4 text-gray-400" />
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-base shadow-2xs">
-                  {activeDetailExpense.icon || '🍔'}
-                </div>
-                <h3 className="text-base font-bold text-gray-900">
-                  {activeDetailExpense.description}
-                </h3>
-                <span className="text-xs text-gray-400 font-medium">
-                  ({getExpenseFilteredItems(activeDetailExpense).length} entries)
-                </span>
+              {/* Left Side: Chevron + Icon + Title + (X entries) + Edit Button */}
+              <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+
+                {editingExpense?.id === activeDetailExpense.id ? (
+                  <div className="flex items-center gap-2 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
+                    <div className="relative flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setShowEditIconPicker((v) => !v)}
+                        className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-base hover:bg-indigo-100 transition-colors shadow-2xs"
+                        title="Change icon"
+                      >
+                        {editingExpense.icon || '🍔'}
+                      </button>
+
+                      {/* Emoji Picker Popover in Modal Header */}
+                      {showEditIconPicker && (
+                        <div className="absolute top-10 left-0 z-50 w-64 bg-white border border-gray-200 rounded-xl shadow-2xl p-3 space-y-2 text-left">
+                          <div className="flex items-center justify-between text-xs font-bold text-gray-700 border-b border-gray-100 pb-1.5">
+                            <span>Choose Icon</span>
+                            <button
+                              type="button"
+                              onClick={() => setShowEditIconPicker(false)}
+                              className="text-gray-400 hover:text-gray-600 p-0.5"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-1 border-b border-gray-100 pb-1.5 overflow-x-auto">
+                            {EMOJI_CATEGORIES.map((cat, idx) => (
+                              <button
+                                key={cat.name}
+                                type="button"
+                                onClick={() => setEditEmojiTab(idx)}
+                                className={`px-2 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap transition-colors ${
+                                  editEmojiTab === idx
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                }`}
+                              >
+                                {cat.icon}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-5 gap-1 max-h-36 overflow-y-auto p-1">
+                            {EMOJI_CATEGORIES[editEmojiTab].emojis.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => {
+                                  setEditingExpense({ ...editingExpense, icon: emoji });
+                                  setShowEditIconPicker(false);
+                                }}
+                                className={`h-8 text-base rounded-lg flex items-center justify-center transition-transform hover:scale-110 ${
+                                  editingExpense.icon === emoji
+                                    ? 'bg-indigo-600 text-white shadow-xs'
+                                    : 'hover:bg-indigo-50'
+                                }`}
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <input
+                      type="text"
+                      value={editingExpense.description}
+                      onChange={(e) =>
+                        setEditingExpense({ ...editingExpense, description: e.target.value })
+                      }
+                      onKeyDown={(e) => e.key === 'Enter' && handleSaveEditExpense()}
+                      autoFocus
+                      className="flex-1 min-w-0 px-2.5 py-1 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-gray-900 bg-white"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={handleSaveEditExpense}
+                      className="p-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex-shrink-0"
+                      title="Save title & icon"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingExpense(null)}
+                      className="p-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors flex-shrink-0"
+                      title="Cancel"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-base shadow-2xs flex-shrink-0">
+                      {activeDetailExpense.icon || '🍔'}
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900 truncate">
+                      {activeDetailExpense.description}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => handleStartEditExpense(activeDetailExpense)}
+                      className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex-shrink-0"
+                      title="Edit title & icon"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs text-gray-400 font-medium flex-shrink-0">
+                      ({getExpenseFilteredItems(activeDetailExpense).length} entries)
+                    </span>
+                  </>
+                )}
               </div>
 
               {/* Right Side: + Add Entry (Purple) | + Add Column (Gray) | Red Trash Icon | Close X */}
