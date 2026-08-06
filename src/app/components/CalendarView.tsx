@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Calendar as CalendarIcon,
   Plus,
   Save,
@@ -40,6 +41,10 @@ import {
   sendPwaNotification,
 } from '../utils/notifications';
 import ConfirmDialog from './ConfirmDialog';
+import {
+  generate2026SacredCalendarEvents,
+  SACRED_TITHI_TYPES,
+} from '../data/sacredEvents2026';
 
 export type SnoozeOption = 'none' | '10min' | '1hr' | 'daily';
 
@@ -64,8 +69,10 @@ interface Props {
 }
 
 const EVENT_ICONS = [
+  // Sacred Tithi & Custom Event Icons
+  '🌑', '🌕', '🐄', '⭐', '🟦', '🔺', '🦚', '🔱', '🕉️',
   // God & Temple & Spiritual
-  '🕉️', '🔱', '🛕', '🪔', '🙏', '📿', '⛩️', '🕌', '⛪', '🕍', '✝️', '☪️', '☸️', '☯️', '🛐', '🕊️',
+  '🛕', '🪔', '🙏', '📿', '⛩️', '🕌', '⛪', '🕍', '✝️', '☪️', '☸️', '☯️', '🛐', '🕊️',
   // Money & Finance & Savings
   '💵', '💰', '🪙', '💳', '💸', '🏦', '📈', '💹', '💎', '🧾', '🤑',
   // General & Reminders
@@ -133,6 +140,18 @@ export default function CalendarView({
   // Confirmation dialog for deletion
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  // Expandable Event Detail Rows state (compressed single-line by default)
+  const [expandedEventIds, setExpandedEventIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandEvent = (id: string) => {
+    setExpandedEventIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   useEffect(() => {
     onUnsavedChanges?.(hasUnsavedChanges, () => {
       saveEvents();
@@ -165,6 +184,80 @@ export default function CalendarView({
       body: 'Test Lock-Screen Notification: Your calendar reminders are active!',
     });
   };
+
+  // Batch Import 2026 Sacred Tithi Events
+  const handleImportSacredEvents = () => {
+    const sacredEvents = generate2026SacredCalendarEvents();
+    const existingIds = new Set(events.map((e) => e.id));
+    const newSacredEvents = sacredEvents.filter((e) => !existingIds.has(e.id));
+
+    if (newSacredEvents.length === 0) {
+      setNotifStatusMessage('All 2026 Sacred Tithi Events are already present in your calendar!');
+    } else {
+      setEvents([...events, ...newSacredEvents]);
+      setNotifStatusMessage(`Successfully imported ${newSacredEvents.length} Sacred 2026 Tithi Events! 🎉`);
+    }
+    setTimeout(() => setNotifStatusMessage(''), 4000);
+  };
+
+  // Apply Sacred Tithi Quick Preset to Event Form
+  const handleApplySacredPreset = (presetKey: string) => {
+    const preset = SACRED_TITHI_TYPES.find((p) => p.key === presetKey);
+    if (!preset || !selectedDate) return;
+    const targetDateStr = format(selectedDate, 'yyyy-MM-dd');
+    const dayMinusOneStr = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
+
+    setEventTitle(preset.name);
+    setEventIcon(preset.icon);
+    setNotificationTime('08:00');
+    setNotificationDates([dayMinusOneStr, targetDateStr]);
+    setTodoText(
+      `${preset.description}. Reminder set for Day -1 (${dayMinusOneStr}) and Event Day (${targetDateStr}) at 8:00 AM.`
+    );
+  };
+
+  // Background interval checker for scheduled reminders (checks every 30s)
+  useEffect(() => {
+    const checkScheduledNotifications = () => {
+      if (notifPermission !== 'granted' || events.length === 0) return;
+      const now = new Date();
+      const currentHHMM = format(now, 'HH:mm'); // e.g. "08:00"
+      const todayStr = format(now, 'yyyy-MM-dd');
+      const firedKey = `tmd_notif_fired_${todayStr}_${currentHHMM}`;
+
+      if (sessionStorage.getItem(firedKey)) return;
+
+      let firedAny = false;
+      events.forEach((ev) => {
+        const eventNotifTime = ev.notificationTime || '08:00';
+        if (eventNotifTime === currentHHMM) {
+          const allDates = ev.notificationDates || [ev.date];
+          if (allDates.includes(todayStr)) {
+            const isDayMinusOne = ev.date !== todayStr;
+            const notifTitle = `${ev.icon || '📌'} ${ev.title} ${
+              isDayMinusOne ? '(Tomorrow Reminder)' : '(Today Event)'
+            }`;
+            const notifBody =
+              ev.todoText || `Reminder for ${ev.title} scheduled for ${ev.date} at 8:00 AM.`;
+
+            sendPwaNotification(notifTitle, {
+              body: notifBody,
+              icon: ev.icon,
+            });
+            firedAny = true;
+          }
+        }
+      });
+
+      if (firedAny) {
+        sessionStorage.setItem(firedKey, 'true');
+      }
+    };
+
+    const interval = setInterval(checkScheduledNotifications, 30000);
+    checkScheduledNotifications();
+    return () => clearInterval(interval);
+  }, [events, notifPermission]);
 
   // Calendar Math
   const monthStart = startOfMonth(currentDate);
@@ -373,8 +466,17 @@ export default function CalendarView({
           </button>
         </div>
 
-        {/* Save & Notification Status */}
-        <div className="flex items-center gap-3">
+        {/* Save, Import Sacred Events & Notification Status */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleImportSacredEvents}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-sm transition-all"
+            title="Import all 2026 Amavasai, Pournami, Pradosham, Karthigai, Ashtami, Navami, Sashti & Sivarathri events with 8 AM notifications"
+          >
+            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+            <span>Import 2026 Sacred Tithi Events</span>
+          </button>
+
           <button
             onClick={handleSave}
             disabled={!hasUnsavedChanges}
@@ -444,6 +546,40 @@ export default function CalendarView({
         )}
       </div>
 
+      {/* Sacred Tithi Calendar Event Icons Legend */}
+      <div className="bg-white rounded-2xl border border-gray-200/80 p-3.5 shadow-2xs space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+            <span>2026 Sacred Tithi Event Icons & Reminders (Day -1 & Event Day @ 8:00 AM)</span>
+          </span>
+          <button
+            onClick={handleImportSacredEvents}
+            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200 transition-colors"
+          >
+            + Load 2026 Tithi Events
+          </button>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+          {SACRED_TITHI_TYPES.map((tithi) => (
+            <div
+              key={tithi.key}
+              onClick={() => handleApplySacredPreset(tithi.key)}
+              className="flex items-center gap-2 p-2 rounded-xl bg-gray-50 hover:bg-indigo-50/70 border border-gray-100 hover:border-indigo-200 cursor-pointer transition-all group"
+              title={`Click to fill form with ${tithi.name} preset`}
+            >
+              <span className="text-xl group-hover:scale-110 transition-transform">{tithi.icon}</span>
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-gray-900 truncate group-hover:text-indigo-600">
+                  {tithi.name}
+                </p>
+                <p className="text-[10px] text-gray-400 font-medium truncate">{tithi.dates.length} events</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* VIEW MODE 1: CALENDAR VIEW */}
       {viewMode === 'calendar' && (
         <div className="space-y-6">
@@ -460,99 +596,134 @@ export default function CalendarView({
                 </span>
               </div>
 
-              <div className="p-4 space-y-3 max-h-96 overflow-y-auto divide-y divide-gray-100">
-                {getEventsForDate(selectedDate).map((ev) => (
-                  <div
-                    key={ev.id}
-                    className={`pt-3 first:pt-0 flex items-start justify-between gap-3 group ${
-                      ev.completed ? 'opacity-60' : ''
-                    }`}
-                  >
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <button
-                        onClick={() => handleToggleCompleted(ev.id)}
-                        className={`w-6 h-6 rounded-full border-2 transition-colors mt-0.5 flex items-center justify-center flex-shrink-0 ${
-                          ev.completed
-                            ? 'bg-green-600 border-green-600 text-white'
-                            : 'border-gray-300 hover:border-indigo-400'
-                        }`}
-                        title={ev.completed ? 'Mark incomplete' : 'Mark complete'}
-                      >
-                        {ev.completed && <Check className="w-3.5 h-3.5" />}
-                      </button>
+              <div className="p-3 space-y-1.5 max-h-96 overflow-y-auto divide-y divide-gray-100">
+                {getEventsForDate(selectedDate).map((ev) => {
+                  const isExpanded = expandedEventIds.has(ev.id);
+                  const selectedDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '';
+                  const isMainEventDay = ev.date === selectedDateStr;
 
-                      <div className="flex-1 min-w-0 space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg flex-shrink-0">{ev.icon || '📌'}</span>
+                  return (
+                    <div
+                      key={ev.id}
+                      className={`pt-2 first:pt-0 pb-1 hover:bg-gray-50/80 rounded-xl px-2 transition-colors ${
+                        ev.completed ? 'opacity-60' : ''
+                      }`}
+                    >
+                      {/* Compressed Single Line Row */}
+                      <div
+                        onClick={() => toggleExpandEvent(ev.id)}
+                        className="flex items-center justify-between gap-2.5 cursor-pointer py-1"
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleCompleted(ev.id);
+                            }}
+                            className={`w-5 h-5 rounded-full border transition-colors flex items-center justify-center flex-shrink-0 ${
+                              ev.completed
+                                ? 'bg-green-600 border-green-600 text-white'
+                                : 'border-gray-300 hover:border-indigo-400'
+                            }`}
+                            title={ev.completed ? 'Mark incomplete' : 'Mark complete'}
+                          >
+                            {ev.completed && <Check className="w-3 h-3" />}
+                          </button>
+
+                          <span className="text-base flex-shrink-0">{ev.icon || '📌'}</span>
+
                           <h4
-                            className={`text-sm font-bold text-gray-900 truncate ${
+                            className={`text-xs sm:text-sm font-bold text-gray-900 truncate ${
                               ev.completed ? 'line-through text-gray-400' : ''
                             }`}
                           >
                             {ev.title}
                           </h4>
-                        </div>
 
-                        {/* Event details badges */}
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          {/* Compact Status Badge */}
+                          {isMainEventDay ? (
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-extrabold text-[10px] flex-shrink-0">
+                              🎯 Event Day
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-extrabold text-[10px] flex-shrink-0 flex items-center gap-0.5">
+                              <Bell className="w-2.5 h-2.5 text-amber-600" />
+                              <span>Reminder ({format(parseISO(ev.date), 'MMM d')})</span>
+                            </span>
+                          )}
+
                           {ev.notificationTime && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-bold border border-indigo-100">
-                              <Clock className="w-3 h-3 text-indigo-600" />
+                            <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px] flex-shrink-0">
+                              <Clock className="w-2.5 h-2.5 text-indigo-600" />
                               <span>{ev.notificationTime}</span>
                             </span>
                           )}
-
-                          {ev.snoozeOption && ev.snoozeOption !== 'none' && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold border border-purple-100">
-                              <Repeat className="w-3 h-3 text-purple-600" />
-                              <span>{SNOOZE_LABELS[ev.snoozeOption]}</span>
-                            </span>
-                          )}
                         </div>
 
-                        {/* Remind Dates Badges */}
-                        {ev.notificationDates && ev.notificationDates.length > 0 && (
-                          <div className="flex items-center gap-1.5 flex-wrap text-xs pt-0.5">
-                            <span className="font-medium text-gray-500">Remind Dates:</span>
-                            {ev.notificationDates.map((dStr) => (
-                              <span
-                                key={dStr}
-                                className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold border border-indigo-100 text-[11px]"
-                              >
-                                {format(parseISO(dStr), 'MMM d')}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* To-Do / Notes */}
-                        {ev.todoText && (
-                          <p className="text-xs text-gray-600 mt-1.5 bg-gray-50 p-2.5 rounded-xl border border-gray-100 font-medium whitespace-pre-wrap">
-                            {ev.todoText}
-                          </p>
-                        )}
+                        {/* Action buttons & Expand chevron */}
+                        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => toggleExpandEvent(ev.id)}
+                            className="p-1 text-gray-400 hover:text-indigo-600 rounded-lg transition-colors"
+                            title={isExpanded ? 'Collapse details' : 'Expand details'}
+                          >
+                            <ChevronDown
+                              className={`w-4 h-4 transform transition-transform ${
+                                isExpanded ? 'rotate-180 text-indigo-600' : ''
+                              }`}
+                            />
+                          </button>
+                          <button
+                            onClick={() => handleStartEdit(ev)}
+                            className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Edit event"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(ev.id)}
+                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete event"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                      <button
-                        onClick={() => handleStartEdit(ev)}
-                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                        title="Edit event"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(ev.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete event"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {/* Expandable Details Content */}
+                      {isExpanded && (
+                        <div className="mt-1 pt-1.5 border-t border-gray-100 text-xs space-y-1.5 pl-7 animate-in fade-in duration-150">
+                          {ev.notificationDates && ev.notificationDates.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-gray-500 text-[11px]">Remind Dates:</span>
+                              {ev.notificationDates.map((dStr) => (
+                                <span
+                                  key={dStr}
+                                  className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold border border-indigo-100 text-[10px]"
+                                >
+                                  {format(parseISO(dStr), 'MMM d, yyyy')}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {ev.snoozeOption && ev.snoozeOption !== 'none' && (
+                            <div className="flex items-center gap-1 text-purple-700 font-semibold text-[11px]">
+                              <Repeat className="w-3 h-3 text-purple-600" />
+                              <span>Snooze: {SNOOZE_LABELS[ev.snoozeOption]}</span>
+                            </div>
+                          )}
+
+                          {ev.todoText && (
+                            <div className="text-xs text-gray-600 bg-gray-50 p-2.5 rounded-xl border border-gray-200/70 font-medium whitespace-pre-wrap">
+                              {ev.todoText}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -607,6 +778,9 @@ export default function CalendarView({
                   const dayEvents = getEventsForDate(day);
                   const isToday = isSameDay(day, new Date());
                   const isSelected = selectedDate && isSameDay(day, selectedDate);
+                  const cellDateStr = format(day, 'yyyy-MM-dd');
+                  const mainEventItems = dayEvents.filter((ev) => ev.date === cellDateStr);
+                  const reminderItems = dayEvents.filter((ev) => ev.date !== cellDateStr);
 
                   return (
                     <button
@@ -619,7 +793,7 @@ export default function CalendarView({
                           setNotificationDates([dateStr]);
                         }
                       }}
-                      className={`aspect-square p-1.5 border rounded-xl transition-all flex flex-col justify-between text-left relative group ${
+                      className={`aspect-square p-1.5 border rounded-xl transition-all relative flex flex-col justify-between text-left group overflow-hidden ${
                         isSelected
                           ? 'border-indigo-600 bg-indigo-50/90 ring-2 ring-indigo-400 shadow-xs'
                           : isToday
@@ -627,31 +801,45 @@ export default function CalendarView({
                             : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
                       }`}
                     >
+                      {/* Date Number Top Left */}
                       <span
-                        className={`text-xs font-extrabold leading-none ${
+                        className={`text-xs font-extrabold leading-none z-10 ${
                           isToday ? 'text-indigo-600' : 'text-gray-800'
                         }`}
                       >
                         {format(day, 'd')}
                       </span>
 
-                      {/* Event Icons indicator list on date cell */}
-                      <div className="flex flex-wrap gap-0.5 mt-0.5 max-h-6 overflow-hidden">
-                        {dayEvents.slice(0, 3).map((ev) => (
-                          <span
-                            key={ev.id}
-                            className="text-[11px] leading-none inline-block transform hover:scale-125 transition-transform"
-                            title={`${ev.icon || '📌'} ${ev.title}`}
-                          >
-                            {ev.icon || '📌'}
-                          </span>
-                        ))}
-                        {dayEvents.length > 3 && (
-                          <span className="text-[9px] font-bold bg-indigo-100 text-indigo-700 px-1 rounded-full leading-none">
-                            +{dayEvents.length - 3}
-                          </span>
-                        )}
-                      </div>
+                      {/* Main Event Day Icons - Larger, Centered in Date Cell */}
+                      {mainEventItems.length > 0 && (
+                        <div className="absolute inset-0 flex items-center justify-center gap-1 z-0 pt-2 pointer-events-none">
+                          {mainEventItems.slice(0, 2).map((ev) => (
+                            <span
+                              key={ev.id}
+                              className="text-base sm:text-xl font-bold leading-none transform hover:scale-125 transition-transform filter drop-shadow-2xs"
+                              title={`🎯 ${ev.icon || '📌'} ${ev.title} (Main Event Day)`}
+                            >
+                              {ev.icon || '📌'}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Reminder Icons - Small, Bottom Right with Bell Icon & Fade Away */}
+                      {reminderItems.length > 0 && (
+                        <div className="absolute bottom-1 right-1 flex items-center gap-0.5 z-10 pointer-events-none">
+                          {reminderItems.slice(0, 2).map((ev) => (
+                            <span
+                              key={ev.id}
+                              className="inline-flex items-center text-[9px] leading-none bg-amber-50/90 border border-amber-200/80 rounded px-1 py-0.5 text-amber-900 font-extrabold opacity-65 group-hover:opacity-100 transition-opacity shadow-2xs"
+                              title={`🔔 Reminder: ${ev.title} (Event on ${format(parseISO(ev.date), 'MMM d')})`}
+                            >
+                              <span>🔔</span>
+                              <span className="text-[8px] opacity-80 ml-0.5">{ev.icon || '📌'}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -680,6 +868,34 @@ export default function CalendarView({
                   </div>
 
                   <div className="space-y-3.5">
+                    {/* Quick Sacred Tithi Presets Selector */}
+                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-2.5 rounded-xl border border-purple-100/80">
+                      <label className="block text-[11px] font-bold text-purple-900 mb-1 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-purple-600" />
+                          <span>Quick Sacred Event Preset</span>
+                        </span>
+                        <span className="text-[10px] text-purple-600 font-semibold">Auto-fills icon & 8 AM reminders</span>
+                      </label>
+                      <select
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleApplySacredPreset(e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                        defaultValue=""
+                        className="w-full px-2.5 py-1.5 text-xs border border-purple-200 rounded-lg bg-white font-semibold text-purple-950 focus:outline-none focus:ring-2 focus:ring-purple-400 cursor-pointer"
+                      >
+                        <option value="" disabled>-- Select a Sacred Event Preset --</option>
+                        {SACRED_TITHI_TYPES.map((tithi) => (
+                          <option key={tithi.key} value={tithi.key}>
+                            {tithi.icon} {tithi.name} (Day -1 & Event Day @ 8 AM)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                     {/* Event Title & Icon (In Same Row with Expandable Popover) */}
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1 flex items-center justify-between">
@@ -991,52 +1207,105 @@ export default function CalendarView({
                 </div>
               ) : (
                 filteredEventsList.map((ev) => {
+                  const isExpanded = expandedEventIds.has(ev.id);
                   const allDates = Array.from(new Set([ev.date, ...(ev.notificationDates || [])]));
 
                   return (
                     <div
                       key={ev.id}
-                      className={`p-4 hover:bg-gray-50/80 transition-colors flex items-start justify-between gap-4 group ${
+                      className={`p-2.5 hover:bg-gray-50/80 transition-colors ${
                         ev.completed ? 'opacity-60 bg-gray-50/40' : ''
                       }`}
                     >
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <button
-                          onClick={() => handleToggleCompleted(ev.id)}
-                          className={`p-1.5 rounded-xl border transition-colors mt-0.5 flex-shrink-0 ${
-                            ev.completed
-                              ? 'bg-green-600 border-green-600 text-white'
-                              : 'border-gray-300 text-transparent hover:border-indigo-400'
-                          }`}
-                          title={ev.completed ? 'Mark incomplete' : 'Mark complete'}
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
+                      {/* Compressed Single Line Row */}
+                      <div
+                        onClick={() => toggleExpandEvent(ev.id)}
+                        className="flex items-center justify-between gap-3 cursor-pointer py-1"
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleCompleted(ev.id);
+                            }}
+                            className={`w-5 h-5 rounded-full border transition-colors flex items-center justify-center flex-shrink-0 ${
+                              ev.completed
+                                ? 'bg-green-600 border-green-600 text-white'
+                                : 'border-gray-300 hover:border-indigo-400'
+                            }`}
+                            title={ev.completed ? 'Mark incomplete' : 'Mark complete'}
+                          >
+                            {ev.completed && <Check className="w-3 h-3" />}
+                          </button>
 
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xl flex-shrink-0">{ev.icon || '📌'}</span>
-                            <h4
-                              className={`text-sm font-bold text-gray-900 truncate ${
-                                ev.completed ? 'line-through text-gray-400' : ''
-                              }`}
-                            >
-                              {ev.title}
-                            </h4>
-                            <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold border border-indigo-100 flex items-center gap-1">
-                              <CalendarIcon className="w-3 h-3 text-indigo-600" />
-                              Event: {format(parseISO(ev.date), 'dd MMM yyyy')}
+                          <span className="text-base flex-shrink-0">{ev.icon || '📌'}</span>
+
+                          <h4
+                            className={`text-xs sm:text-sm font-bold text-gray-900 truncate ${
+                              ev.completed ? 'line-through text-gray-400' : ''
+                            }`}
+                          >
+                            {ev.title}
+                          </h4>
+
+                          <span className="text-[11px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold border border-indigo-100 flex-shrink-0 flex items-center gap-1">
+                            <CalendarIcon className="w-3 h-3 text-indigo-600" />
+                            {format(parseISO(ev.date), 'dd MMM yyyy')}
+                          </span>
+
+                          {ev.notificationTime && (
+                            <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold text-[10px] flex-shrink-0">
+                              <Clock className="w-2.5 h-2.5 text-indigo-600" />
+                              <span>{ev.notificationTime}</span>
                             </span>
-                          </div>
+                          )}
+                        </div>
 
-                          {/* Multiple Notification Dates Badges */}
+                        {/* Expand Chevron & Action Buttons */}
+                        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => toggleExpandEvent(ev.id)}
+                            className="p-1 text-gray-400 hover:text-indigo-600 rounded-lg transition-colors"
+                            title={isExpanded ? 'Collapse details' : 'Expand details'}
+                          >
+                            <ChevronDown
+                              className={`w-4 h-4 transform transition-transform ${
+                                isExpanded ? 'rotate-180 text-indigo-600' : ''
+                              }`}
+                            />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setViewMode('calendar');
+                              handleStartEdit(ev);
+                            }}
+                            className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Edit event"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(ev.id)}
+                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete event"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expandable Details */}
+                      {isExpanded && (
+                        <div className="mt-1 pt-2 border-t border-gray-100 text-xs space-y-1.5 pl-7 animate-in fade-in duration-150">
                           {allDates.length > 0 && (
-                            <div className="flex items-center gap-1.5 flex-wrap text-xs pt-0.5">
-                              <span className="font-semibold text-gray-500">Remind Dates ({allDates.length}):</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-gray-500 text-[11px]">
+                                Remind Dates ({allDates.length}):
+                              </span>
                               {allDates.map((dStr) => (
                                 <span
                                   key={dStr}
-                                  className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 font-bold text-[11px]"
+                                  className="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold text-[10px]"
                                 >
                                   {format(parseISO(dStr), 'MMM d, yyyy')}
                                 </span>
@@ -1044,53 +1313,20 @@ export default function CalendarView({
                             </div>
                           )}
 
-                          {/* Timing and Snooze Info */}
-                          <div className="flex flex-wrap items-center gap-2 text-xs pt-0.5">
-                            {ev.notificationTime && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100">
-                                <Clock className="w-3 h-3 text-indigo-600" />
-                                <span>Time: {ev.notificationTime}</span>
-                              </span>
-                            )}
+                          {ev.snoozeOption && ev.snoozeOption !== 'none' && (
+                            <div className="flex items-center gap-1 text-purple-700 font-semibold text-[11px]">
+                              <Repeat className="w-3 h-3 text-purple-600" />
+                              <span>Snooze: {SNOOZE_LABELS[ev.snoozeOption]}</span>
+                            </div>
+                          )}
 
-                            {ev.snoozeOption && ev.snoozeOption !== 'none' && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-semibold border border-purple-100">
-                                <Repeat className="w-3 h-3 text-purple-600" />
-                                <span>Snooze: {SNOOZE_LABELS[ev.snoozeOption]}</span>
-                              </span>
-                            )}
-                          </div>
-
-                          {/* To-Do details */}
                           {ev.todoText && (
-                            <div className="text-xs text-gray-600 bg-gray-50/80 p-2.5 rounded-xl border border-gray-200/60 mt-1.5 space-y-1">
-                              <span className="font-bold text-gray-700 block">To-Do Notes:</span>
-                              <p className="whitespace-pre-wrap">{ev.todoText}</p>
+                            <div className="text-xs text-gray-600 bg-gray-50/80 p-2.5 rounded-xl border border-gray-200/60 font-medium whitespace-pre-wrap">
+                              {ev.todoText}
                             </div>
                           )}
                         </div>
-                      </div>
-
-                      {/* Edit & Delete Action Buttons */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => {
-                            setViewMode('calendar');
-                            handleStartEdit(ev);
-                          }}
-                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
-                          title="Edit event"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setConfirmDeleteId(ev.id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
-                          title="Delete event"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      )}
                     </div>
                   );
                 })
