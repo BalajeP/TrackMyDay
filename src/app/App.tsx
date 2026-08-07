@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { Calendar, Activity, Utensils, Dumbbell, DollarSign, Target, Users, Pencil, X, Camera, Smile, Type, ListChecks, LogOut, Loader2, Download } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Calendar, Activity, Utensils, Dumbbell, DollarSign, Target, Users, Pencil, X, Camera, Smile, Type, ListChecks, LogOut, Loader2, Download, Settings, Sun, Moon, Check, Globe } from 'lucide-react';
 import { format } from 'date-fns';
 import DailyActivities from './components/DailyActivities';
 import MealSchedule from './components/MealSchedule';
@@ -12,10 +12,13 @@ import PWAWrapper from './components/PWAWrapper';
 import { useAuth } from './hooks/useAuth';
 import { useSupabasePersistedState } from './hooks/useSupabasePersistedState';
 import { usePWA } from './hooks/usePWA';
+import { Language, t } from './utils/translations';
+import { startNotificationScheduler, stopNotificationScheduler } from './utils/notificationScheduler';
 
 type Tab = 'activities' | 'meals' | 'workout' | 'expenses' | 'calendar' | 'tracking';
 type Person = 'partner1' | 'partner2' | 'both';
 type AvatarType = 'letter' | 'emoji' | 'photo';
+type ThemeMode = 'light' | 'dark';
 
 export interface TrackingReminder {
   id: string;
@@ -45,7 +48,7 @@ const BG_COLORS = [
 const EMOJI_CATEGORIES = {
   'Reactions': ['😀','😊','🥰','😍','🤩','😎','🥳','😇','🤗','😄','😁','🤣','😂','🙂','🤭','😘','😗','😙','😚','💪','👍','🙌','👏','🫶','❤️','🧡','💛','💚','💙','💜'],
   'Flowers': ['🌸','🌺','🌻','🌹','🌷','💐','🌼','🌿','🍀','🌱','🪷','🌾','🍁','🍂','🍃','🌴','🌵','🎋','🌲','🌳','🎍','🪻','🪸','🫧','✨','🌟','⭐','🌙','☀️','🌈'],
-  'Animals': ['🐱','🐶','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🦄','🐸','🐵','🦋','🦜','🐙','🦒','🦓','🦧','🐘','🦛','🦏','🐬','🐳','🦭','🦅','🦆','🦉'],
+  'Animals': ['🐱','🐶','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🦄','🐸','🐵','🦋','🦜','🐙','🦒','ZE','🦧','🐘','🦛','🦏','🐬','🐳','🦭','🦅','🦆','🦉'],
 };
 
 const DEFAULT_PARTNER1: PartnerProfile = { name: 'Partner 1', avatarType: 'letter', letter: 'P', bgColor: '#6366f1' };
@@ -80,6 +83,112 @@ function Avatar({ profile, size = 'md' }: { profile: PartnerProfile; size?: 'sm'
   );
 }
 
+// ── Settings Modal ────────────────────────────────────────────────────────────
+function SettingsModal({
+  theme,
+  onThemeChange,
+  lang,
+  onLangChange,
+  onClose,
+}: {
+  theme: ThemeMode;
+  onThemeChange: (t: ThemeMode) => void;
+  lang: Language;
+  onLangChange: (l: Language) => void;
+  onClose: () => void;
+}) {
+  const languages: { id: Language; label: string; flag: string }[] = [
+    { id: 'en', label: 'English', flag: '🇬🇧' },
+    { id: 'ta', label: 'தமிழ்', flag: '🇮🇳' },
+    { id: 'hi', label: 'हिन्दी', flag: '🇮🇳' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <h2 className="font-bold text-gray-900 dark:text-gray-100">{t('settingsTitle', lang)}</h2>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* Language Selection */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              <Globe className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <span>{t('languageSelection', lang)}</span>
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {languages.map((l) => (
+                <button
+                  key={l.id}
+                  onClick={() => onLangChange(l.id)}
+                  className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border-2 transition-all ${
+                    lang === l.id
+                      ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  <span className="text-xl">{l.flag}</span>
+                  <span className="text-xs font-semibold">{l.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Theme Switcher */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2.5">
+              {t('appearanceTheme', lang)}
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => onThemeChange('light')}
+                className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${
+                  theme === 'light'
+                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 font-bold shadow-xs'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                }`}
+              >
+                <Sun className="w-5 h-5 text-amber-500" />
+                <span className="text-xs">{t('lightMode', lang)}</span>
+                {theme === 'light' && <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full">{t('active', lang)}</span>}
+              </button>
+
+              <button
+                onClick={() => onThemeChange('dark')}
+                className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${
+                  theme === 'dark'
+                    ? 'border-indigo-500 bg-gray-900 text-indigo-400 font-bold shadow-xs'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                }`}
+              >
+                <Moon className="w-5 h-5 text-indigo-400" />
+                <span className="text-xs">{t('darkMode', lang)}</span>
+                {theme === 'dark' && <span className="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded-full">{t('active', lang)}</span>}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-5 pb-5">
+          <button
+            onClick={onClose}
+            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-xs transition-colors"
+          >
+            {t('done', lang)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Avatar picker modal ───────────────────────────────────────────────────────
 function AvatarPickerModal({ profile, onSave, onClose }: { profile: PartnerProfile; onSave: (p: PartnerProfile) => void; onClose: () => void }) {
   const [draft, setDraft] = useState<PartnerProfile>({ ...profile });
@@ -99,30 +208,30 @@ function AvatarPickerModal({ profile, onSave, onClose }: { profile: PartnerProfi
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Edit Profile</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-4 h-4 text-gray-500" /></button>
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+          <h2 className="font-semibold text-gray-900 dark:text-gray-100">Edit Profile</h2>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"><X className="w-4 h-4 text-gray-500 dark:text-gray-400" /></button>
         </div>
         <div className="p-5 space-y-5">
           <div className="flex items-center gap-4">
             <Avatar profile={{ ...draft, avatarType: tab }} size="lg" />
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Name</label>
               <input type="text" value={draft.name} onChange={(e) => set({ name: e.target.value })} maxLength={20}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-gray-900 dark:text-white" />
             </div>
           </div>
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+          <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
             {([['photo', Camera, 'Photo'], ['emoji', Smile, 'Emoji'], ['letter', Type, 'Letter']] as const).map(([t, Icon, label]) => (
-              <button key={t} onClick={() => setTab(t)} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${tab === t ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+              <button key={t} onClick={() => setTab(t)} className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium transition-colors ${tab === t ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
                 <Icon className="w-3.5 h-3.5" />{label}
               </button>
             ))}
           </div>
           {tab === 'photo' && (
             <div className="space-y-3">
-              <button onClick={() => fileRef.current?.click()} className="w-full py-8 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center gap-2 text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
+              <button onClick={() => fileRef.current?.click()} className="w-full py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl flex flex-col items-center gap-2 text-gray-500 dark:text-gray-400 hover:border-indigo-400 hover:text-indigo-600 transition-colors">
                 <Camera className="w-8 h-8" /><span className="text-sm font-medium">Upload photo</span><span className="text-xs text-gray-400">JPG or PNG</span>
               </button>
               <input ref={fileRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={handlePhoto} />
@@ -133,16 +242,16 @@ function AvatarPickerModal({ profile, onSave, onClose }: { profile: PartnerProfi
             <div className="space-y-3">
               <div className="flex gap-1">
                 {(Object.keys(EMOJI_CATEGORIES) as Array<keyof typeof EMOJI_CATEGORIES>).map((cat) => (
-                  <button key={cat} onClick={() => setEmojiCat(cat)} className={`flex-1 py-1.5 text-xs rounded-lg transition-colors ${emojiCat === cat ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-gray-500 hover:bg-gray-100'}`}>{cat}</button>
+                  <button key={cat} onClick={() => setEmojiCat(cat)} className={`flex-1 py-1.5 text-xs rounded-lg transition-colors ${emojiCat === cat ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200 font-medium' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>{cat}</button>
                 ))}
               </div>
               <div className="grid grid-cols-6 gap-1 max-h-40 overflow-y-auto">
                 {EMOJI_CATEGORIES[emojiCat].map((em) => (
-                  <button key={em} onClick={() => set({ emoji: em })} className={`text-xl py-1.5 rounded-lg transition-colors ${draft.emoji === em ? 'bg-indigo-100 ring-2 ring-indigo-400' : 'hover:bg-gray-100'}`}>{em}</button>
+                  <button key={em} onClick={() => set({ emoji: em })} className={`text-xl py-1.5 rounded-lg transition-colors ${draft.emoji === em ? 'bg-indigo-100 dark:bg-indigo-900 ring-2 ring-indigo-400' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}>{em}</button>
                 ))}
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-1.5">Background color</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">Background color</p>
                 <div className="flex flex-wrap gap-2">
                   {BG_COLORS.map((c) => <button key={c} onClick={() => set({ bgColor: c })} style={{ backgroundColor: c }} className={`w-6 h-6 rounded-full transition-transform ${draft.bgColor === c ? 'scale-125 ring-2 ring-offset-1 ring-gray-400' : 'hover:scale-110'}`} />)}
                 </div>
@@ -152,12 +261,12 @@ function AvatarPickerModal({ profile, onSave, onClose }: { profile: PartnerProfi
           {tab === 'letter' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Single letter</label>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Single letter</label>
                 <input type="text" value={draft.letter} maxLength={1} onChange={(e) => set({ letter: e.target.value })} placeholder="A"
-                  className="w-20 text-center text-3xl font-bold px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400" style={{ color: draft.bgColor }} />
+                  className="w-20 text-center text-3xl font-bold px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-gray-900 dark:text-white" style={{ color: draft.bgColor }} />
               </div>
               <div>
-                <p className="text-xs font-medium text-gray-500 mb-1.5">Background color</p>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">Background color</p>
                 <div className="flex flex-wrap gap-2">
                   {BG_COLORS.map((c) => <button key={c} onClick={() => set({ bgColor: c })} style={{ backgroundColor: c }} className={`w-6 h-6 rounded-full transition-transform ${draft.bgColor === c ? 'scale-125 ring-2 ring-offset-1 ring-gray-400' : 'hover:scale-110'}`} />)}
                 </div>
@@ -183,11 +292,11 @@ function PartnerButton({ profile, active, onSelect, onEdit }: { profile: Partner
         <button onClick={onSelect} className={`rounded-full transition-all ${active ? 'ring-[3px] ring-indigo-500 ring-offset-2' : 'ring-2 ring-transparent hover:ring-gray-300 ring-offset-1'}`}>
           <Avatar profile={profile} size="md" />
         </button>
-        <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-indigo-50">
-          <Pencil className="w-2.5 h-2.5 text-gray-600" />
+        <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-indigo-50 dark:hover:bg-gray-700">
+          <Pencil className="w-2.5 h-2.5 text-gray-600 dark:text-gray-300" />
         </button>
       </div>
-      <span className={`text-[10px] font-medium truncate max-w-[52px] text-center ${active ? 'text-indigo-600' : 'text-gray-500'}`}>{profile.name}</span>
+      <span className={`text-[10px] font-medium truncate max-w-[52px] text-center ${active ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'}`}>{profile.name}</span>
     </div>
   );
 }
@@ -200,6 +309,38 @@ export default function App() {
   const [config, setConfig, saveConfig] = useSupabasePersistedState<AppConfig>('app_config', DEFAULT_CONFIG, DEFAULT_CONFIG, accessToken);
   const [trackingReminders, setTrackingReminders, saveTracking] = useSupabasePersistedState<TrackingReminder[]>('tracking_reminders', [], [], accessToken);
   const [editingPartner, setEditingPartner] = useState<'partner1' | 'partner2' | null>(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  // Theme State ('light' | 'dark')
+  const [theme, setTheme] = useState<ThemeMode>(() => {
+    return (localStorage.getItem('tmd_theme') as ThemeMode) || 'light';
+  });
+
+  // Language State ('en' | 'ta' | 'hi')
+  const [lang, setLang] = useState<Language>(() => {
+    return (localStorage.getItem('tmd_language') as Language) || 'en';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('tmd_theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem('tmd_language', lang);
+  }, [lang]);
+
+  // Start background notification scheduler engine
+  useEffect(() => {
+    startNotificationScheduler();
+    return () => {
+      stopNotificationScheduler();
+    };
+  }, []);
 
   // Unsaved-changes guard
   const [pendingTab, setPendingTab] = useState<Tab | null>(null);
@@ -246,23 +387,23 @@ export default function App() {
   };
 
   const tabs = [
-    { id: 'activities' as Tab, label: 'Activities', icon: Activity },
-    { id: 'tracking' as Tab, label: 'Tracking', icon: ListChecks },
-    { id: 'meals' as Tab, label: 'Meals', icon: Utensils },
-    { id: 'workout' as Tab, label: 'Workout', icon: Dumbbell },
-    { id: 'expenses' as Tab, label: 'Expenses', icon: DollarSign },
-    { id: 'calendar' as Tab, label: 'Calendar', icon: Calendar },
+    { id: 'activities' as Tab, label: t('activities', lang), icon: Activity },
+    { id: 'tracking' as Tab, label: t('tracking', lang), icon: ListChecks },
+    { id: 'meals' as Tab, label: t('meals', lang), icon: Utensils },
+    { id: 'workout' as Tab, label: t('workout', lang), icon: Dumbbell },
+    { id: 'expenses' as Tab, label: t('expenses', lang), icon: DollarSign },
+    { id: 'calendar' as Tab, label: t('calendar', lang), icon: Calendar },
   ];
 
-  const sharedProps = { activePerson, partner1Name: partner1.name, partner2Name: '', accessToken };
+  const sharedProps = { activePerson, partner1Name: partner1.name, partner2Name: '', accessToken, lang };
 
   if (authLoading) {
     return (
       <PWAWrapper>
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-            <p className="text-sm text-gray-500">Loading...</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Loading...</p>
           </div>
         </div>
       </PWAWrapper>
@@ -279,35 +420,47 @@ export default function App() {
 
   return (
     <PWAWrapper>
-      <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
-              <Users className="w-7 h-7 text-indigo-600 flex-shrink-0" />
+              <Users className="w-7 h-7 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
               <div className="min-w-0">
-                <h1 className="text-xl font-bold text-gray-900 leading-tight">Track My Day</h1>
-                <p className="text-xs text-gray-400 mt-0.5">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">{t('appName', lang)}</h1>
+                <p className="text-xs text-gray-400 dark:text-gray-400 mt-0.5">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
               </div>
             </div>
 
             <div className="flex items-end gap-3 flex-shrink-0">
               <PartnerButton profile={partner1} active={true} onSelect={() => {}} onEdit={() => setEditingPartner('partner1')} />
 
+              {/* Settings Button Next to User Profile */}
+              <button
+                onClick={() => setShowSettingsModal(true)}
+                title={t('settings', lang)}
+                className="flex flex-col items-center gap-1 group"
+              >
+                <div className="w-11 h-11 rounded-full flex items-center justify-center ring-2 ring-gray-200 dark:ring-gray-700 hover:ring-indigo-400 bg-gray-50 dark:bg-gray-700/60 hover:bg-indigo-50 dark:hover:bg-gray-700 transition-all">
+                  <Settings className="w-4 h-4 text-gray-600 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
+                </div>
+                <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{t('settings', lang)}</span>
+              </button>
+
               {isInstallable && (
-                <button onClick={promptInstall} title="Install app" className="flex flex-col items-center gap-1 group">
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center ring-2 ring-indigo-200 hover:ring-indigo-400 bg-indigo-50 hover:bg-indigo-100 transition-all">
-                    <Download className="w-4 h-4 text-indigo-600 group-hover:text-indigo-700 transition-colors" />
+                <button onClick={promptInstall} title={t('install', lang)} className="flex flex-col items-center gap-1 group">
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center ring-2 ring-indigo-200 hover:ring-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 transition-all">
+                    <Download className="w-4 h-4 text-indigo-600 dark:text-indigo-400 group-hover:text-indigo-700 transition-colors" />
                   </div>
-                  <span className="text-[10px] font-medium text-indigo-500 group-hover:text-indigo-600">Install</span>
+                  <span className="text-[10px] font-medium text-indigo-500 dark:text-indigo-400 group-hover:text-indigo-600">{t('install', lang)}</span>
                 </button>
               )}
 
-              <button onClick={logout} title="Sign out" className="flex flex-col items-center gap-1 group">
-                <div className="w-11 h-11 rounded-full flex items-center justify-center ring-2 ring-gray-200 hover:ring-red-300 bg-gray-50 hover:bg-red-50 transition-all">
-                  <LogOut className="w-4 h-4 text-gray-500 group-hover:text-red-500 transition-colors" />
+              <button onClick={logout} title={t('logout', lang)} className="flex flex-col items-center gap-1 group">
+                <div className="w-11 h-11 rounded-full flex items-center justify-center ring-2 ring-gray-200 dark:ring-gray-700 hover:ring-red-300 bg-gray-50 dark:bg-gray-700/60 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all">
+                  <LogOut className="w-4 h-4 text-gray-500 dark:text-gray-400 group-hover:text-red-500 transition-colors" />
                 </div>
-                <span className="text-[10px] font-medium text-gray-400 group-hover:text-red-400">Logout</span>
+                <span className="text-[10px] font-medium text-gray-400 dark:text-gray-400 group-hover:text-red-400">{t('logout', lang)}</span>
               </button>
             </div>
           </div>
@@ -318,7 +471,7 @@ export default function App() {
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap text-sm ${activeTab === tab.id ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'}`}>
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap text-sm ${activeTab === tab.id ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold' : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300'}`}>
                   <Icon className="w-4 h-4" />{tab.label}
                 </button>
               );
@@ -339,17 +492,17 @@ export default function App() {
       {/* Unsaved changes navigation guard */}
       {pendingTab && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 dark:border-gray-700">
             <div className="px-6 pt-6 pb-2">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                   </svg>
                 </div>
                 <div>
-                  <h2 className="font-semibold text-gray-900">Unsaved Changes</h2>
-                  <p className="text-sm text-gray-500 mt-0.5">You have unsaved changes on this page.</p>
+                  <h2 className="font-semibold text-gray-900 dark:text-gray-100">Unsaved Changes</h2>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">You have unsaved changes on this page.</p>
                 </div>
               </div>
             </div>
@@ -369,13 +522,13 @@ export default function App() {
                   commitTabChange(pendingTab);
                   setPendingTab(null);
                 }}
-                className="w-full py-2.5 bg-red-50 text-red-600 text-sm font-medium rounded-xl hover:bg-red-100 transition-colors border border-red-200"
+                className="w-full py-2.5 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 text-sm font-medium rounded-xl hover:bg-red-100 dark:hover:bg-red-900/60 transition-colors border border-red-200 dark:border-red-800"
               >
                 Discard & Continue
               </button>
               <button
                 onClick={() => setPendingTab(null)}
-                className="w-full py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 transition-colors"
+                className="w-full py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
               >
                 Stay on this page
               </button>
@@ -389,6 +542,16 @@ export default function App() {
           profile={partner1}
           onSave={setPartner1}
           onClose={() => setEditingPartner(null)}
+        />
+      )}
+
+      {showSettingsModal && (
+        <SettingsModal
+          theme={theme}
+          onThemeChange={setTheme}
+          lang={lang}
+          onLangChange={setLang}
+          onClose={() => setShowSettingsModal(false)}
         />
       )}
       </div>
