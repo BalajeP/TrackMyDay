@@ -333,7 +333,10 @@ export default function Expenditure({
     [dateFilterType, selectedMonth, selectedYear]
   );
 
-  // Filtered Expenses
+  // State to toggle history view inside Expense Detail Modal
+  const [showAllModalHistory, setShowAllModalHistory] = useState<boolean>(false);
+
+  // Filtered Expenses (Shows all expense cards for active person, filtered by category selection if applied)
   const filteredExpenses = useMemo(() => {
     return partnerExpenses.filter((expense) => {
       // Multi-category filter check
@@ -342,15 +345,9 @@ export default function Expenditure({
           return false;
         }
       }
-
-      // If expense has sub-items, check if any sub-item matches the date filter
-      if (expense.items && expense.items.length > 0) {
-        return expense.items.some((item) => isDateMatchPeriod(item.date));
-      }
-
-      return isDateMatchPeriod(expense.date);
+      return true;
     });
-  }, [partnerExpenses, selectedCategories, isDateMatchPeriod]);
+  }, [partnerExpenses, selectedCategories]);
 
   // Helper to compute expense total amount for the selected period
   const getExpenseTotal = useCallback(
@@ -360,7 +357,7 @@ export default function Expenditure({
           .filter((item) => isDateMatchPeriod(item.date))
           .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
       }
-      return Number(expense.amount) || 0;
+      return isDateMatchPeriod(expense.date) ? Number(expense.amount) || 0 : 0;
     },
     [isDateMatchPeriod]
   );
@@ -397,7 +394,9 @@ export default function Expenditure({
     const map: Record<string, number> = {};
     filteredExpenses.forEach((exp) => {
       const amt = getExpenseTotal(exp);
-      map[exp.category] = (map[exp.category] || 0) + amt;
+      if (amt > 0) {
+        map[exp.category] = (map[exp.category] || 0) + amt;
+      }
     });
     return map;
   }, [filteredExpenses, getExpenseTotal]);
@@ -1642,8 +1641,20 @@ export default function Expenditure({
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <span className="text-xs text-gray-400 font-medium flex-shrink-0">
-                      ({getExpenseFilteredItems(activeDetailExpense).length} entries)
+                      ({(showAllModalHistory ? activeDetailExpense.items || [] : getExpenseFilteredItems(activeDetailExpense)).length} entries)
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAllModalHistory((v) => !v)}
+                      className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border transition-all ${
+                        showAllModalHistory
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                      }`}
+                      title="Toggle between current period entries and complete card history"
+                    >
+                      {showAllModalHistory ? 'All History' : 'Period Filter'}
+                    </button>
                   </>
                 )}
               </div>
@@ -1977,17 +1988,25 @@ export default function Expenditure({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
-                    {getExpenseFilteredItems(activeDetailExpense).length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={4 + (activeDetailExpense.customColumns || []).length}
-                          className="py-8 text-center text-gray-400 italic"
-                        >
-                          No entries yet. Click "+ Add Entry" above to create an entry!
-                        </td>
-                      </tr>
-                    ) : (
-                      getExpenseFilteredItems(activeDetailExpense).map((item) => {
+                    {(() => {
+                      const modalItems = showAllModalHistory
+                        ? activeDetailExpense.items || []
+                        : getExpenseFilteredItems(activeDetailExpense);
+
+                      if (modalItems.length === 0) {
+                        return (
+                          <tr>
+                            <td
+                              colSpan={4 + (activeDetailExpense.customColumns || []).length}
+                              className="py-8 text-center text-gray-400 italic"
+                            >
+                              No entries found {showAllModalHistory ? 'in history' : 'for this period'}. Click "+ Add Entry" above to create an entry!
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return modalItems.map((item) => {
                         const isItemEditing =
                           editingItem?.expenseId === activeDetailExpense.id &&
                           editingItem?.itemId === item.id;
@@ -2161,8 +2180,8 @@ export default function Expenditure({
                             </td>
                           </tr>
                         );
-                      })
-                    )}
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>

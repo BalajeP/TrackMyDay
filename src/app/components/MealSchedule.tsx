@@ -38,24 +38,52 @@ const emptyDay = (): Record<MealType, MealEntry> => ({
   lunch: emptyEntry(), fruit: emptyEntry(), dinner: emptyEntry(),
 });
 
-// Computes fixed position for a portal panel anchored below a trigger element
-function usePortalPosition(btnRef: React.RefObject<HTMLButtonElement | null>, open: boolean) {
-  const [pos, setPos] = useState({ top: 0, left: 0, flipRight: false });
+// Computes fixed position for a portal panel anchored relative to a trigger element, auto-flipping if needed
+function usePortalPosition(
+  btnRef: React.RefObject<HTMLButtonElement | null>,
+  panelRef: React.RefObject<HTMLDivElement | null>,
+  open: boolean
+) {
+  const [pos, setPos] = useState({ top: 0, left: 0, maxListHeight: 192 });
 
   const compute = useCallback(() => {
     if (!btnRef.current) return;
     const r = btnRef.current.getBoundingClientRect();
     const panelW = 220;
-    const flipRight = r.left + panelW > window.innerWidth - 8;
-    setPos({
-      top: r.bottom + 6,
-      left: flipRight ? Math.max(8, r.right - panelW) : r.left,
-      flipRight,
-    });
-  }, [btnRef]);
+    const padding = 12;
+
+    const measuredH = panelRef.current?.offsetHeight || 0;
+    const panelH = measuredH > 0 ? measuredH : 280;
+
+    const flipRight = r.left + panelW > window.innerWidth - padding;
+    const left = flipRight ? Math.max(padding, r.right - panelW) : Math.max(padding, r.left);
+
+    const spaceBelow = window.innerHeight - r.bottom - padding;
+    const spaceAbove = r.top - padding;
+
+    let top = 0;
+    let availableSpace = spaceBelow;
+
+    if (spaceBelow < panelH && spaceAbove > spaceBelow) {
+      availableSpace = spaceAbove;
+      const targetH = Math.min(panelH, spaceAbove);
+      top = Math.max(padding, r.top - targetH - 6);
+    } else {
+      availableSpace = spaceBelow;
+      top = r.bottom + 6;
+    }
+
+    const maxListHeight = Math.max(80, Math.min(220, availableSpace - 110));
+
+    setPos({ top, left, maxListHeight });
+  }, [btnRef, panelRef]);
 
   useEffect(() => {
-    if (open) compute();
+    if (open) {
+      compute();
+      const raf = requestAnimationFrame(compute);
+      return () => cancelAnimationFrame(raf);
+    }
   }, [open, compute]);
 
   useEffect(() => {
@@ -81,7 +109,7 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
   const [searchQuery, setSearchQuery] = useState('');
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const pos = usePortalPosition(btnRef, open);
+  const pos = usePortalPosition(btnRef, panelRef, open);
   const styles = COL_STYLES[color];
 
   useEffect(() => {
@@ -179,7 +207,7 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
           </div>
 
           {/* List */}
-          <div className="max-h-52 overflow-y-auto">
+          <div style={{ maxHeight: pos.maxListHeight }} className="overflow-y-auto">
             {filteredOptions.length === 0 && (
               <p className="px-3 py-4 text-xs text-gray-400 italic text-center">
                 {options.length === 0 ? 'No items yet' : 'No matching items'}
@@ -214,7 +242,7 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
   const [searchQuery, setSearchQuery] = useState('');
   const btnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const pos = usePortalPosition(btnRef, open);
+  const pos = usePortalPosition(btnRef, panelRef, open);
 
   useEffect(() => {
     if (!open) {
@@ -285,7 +313,7 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
             </div>
           </div>
 
-          <div className="max-h-48 overflow-y-auto">
+          <div style={{ maxHeight: pos.maxListHeight }} className="overflow-y-auto">
             {value && !searchQuery && (
               <button
                 onClick={() => { onChange(''); setOpen(false); }}
