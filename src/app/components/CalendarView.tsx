@@ -563,7 +563,7 @@ export default function CalendarView({
           </button>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {SACRED_TITHI_TYPES.map((tithi) => {
+          {SACRED_TITHI_TYPES.filter((t) => t.dates.length > 0).map((tithi) => {
             const isOpen = activeTithiMenu === tithi.key;
             const localizedName = getSacredTithiName(tithi, lang);
             return (

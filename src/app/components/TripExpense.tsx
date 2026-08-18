@@ -678,11 +678,11 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
   return (
     <div className="space-y-6">
       {/* Global Card for Trip Expense Section */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-4 mb-6">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Trip Expense</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Manage and track splitting for multiple trips</p>
+            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Trip Expense</h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Manage and track splitting for multiple trips</p>
           </div>
           <button
             onClick={handleAddTrip}
@@ -696,11 +696,11 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
         {/* Trips List */}
         <div className="space-y-6">
           {activeState.trips.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 border border-dashed border-gray-200 rounded-xl">
+            <div className="text-center py-12 text-gray-400 dark:text-gray-500 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
               <p className="text-sm font-medium">No trips registered yet.</p>
               <button
                 onClick={handleAddTrip}
-                className="mt-3 text-xs text-indigo-600 font-semibold hover:underline"
+                className="mt-3 text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
               >
                 Create your first trip tracker
               </button>
@@ -739,24 +739,24 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                     setDraggedTripId(null);
                     setCanDragId(null);
                   }}
-                  className={`border border-gray-200 rounded-2xl shadow-sm overflow-hidden bg-white transition-all duration-200 ${
+                  className={`border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm overflow-hidden bg-white dark:bg-gray-800 transition-all duration-200 ${
                     draggedTripId === trip.id ? 'opacity-40 border-dashed border-indigo-400' : ''
                   }`}
                 >
                   {/* Trip Card Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-4 bg-gray-50/70 border-b border-gray-200 gap-3 group/header">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-4 bg-gray-50/70 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-700 gap-3 group/header">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div
                         onMouseDown={() => setCanDragId(trip.id)}
                         onMouseUp={() => setCanDragId(null)}
-                        className="opacity-0 group-hover/header:opacity-100 transition-opacity cursor-grab flex-shrink-0 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-200"
+                        className="opacity-0 group-hover/header:opacity-100 transition-opacity cursor-grab flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                         title="Drag to reorder"
                       >
                         <GripVertical className="w-4 h-4" />
                       </div>
                       <button
                         onClick={() => toggleTripExpanded(trip.id)}
-                        className="p-1 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors cursor-pointer"
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-500 dark:text-gray-400 transition-colors cursor-pointer"
                       >
                         {trip.expanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                       </button>
@@ -771,18 +771,18 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                               if (e.key === 'Enter') saveTitle(trip.id);
                               if (e.key === 'Escape') setEditingTitleId(null);
                             }}
-                            className="px-2.5 py-1 border border-indigo-400 rounded-xl text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                            className="px-2.5 py-1 border border-indigo-400 rounded-xl text-sm font-semibold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-gray-900"
                             autoFocus
                           />
                           <button
                             onClick={() => saveTitle(trip.id)}
-                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg cursor-pointer"
+                            className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 rounded-lg cursor-pointer"
                           >
                             <Check className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setEditingTitleId(null)}
-                            className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg cursor-pointer"
+                            className="p-1.5 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg cursor-pointer"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -791,13 +791,13 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                         <div className="flex items-center gap-2 group min-w-0">
                           <h3
                             onClick={() => startEditingTitle(trip.id, trip.title)}
-                            className="text-base font-bold text-gray-800 hover:text-indigo-600 transition-colors cursor-pointer truncate"
+                            className="text-base font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer truncate"
                           >
                             {trip.title}
                           </h3>
                           <button
                             onClick={() => startEditingTitle(trip.id, trip.title)}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-indigo-600 transition-opacity"
+                            className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-opacity"
                             title="Edit Trip Title"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -810,19 +810,19 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                     {trip.expanded && (
                       <div className="flex flex-wrap items-center gap-2">
                         {/* Exports */}
-                        <div className="flex items-center border border-gray-200 bg-white rounded-lg p-0.5 shadow-sm">
+                        <div className="flex items-center border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-lg p-0.5 shadow-sm">
                           <button
                             onClick={() => exportToPDF(trip)}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-colors text-xs font-semibold flex items-center gap-1 cursor-pointer"
                             title="Export to PDF"
                           >
                             <FileText className="w-3.5 h-3.5" />
                             <span className="hidden md:inline">PDF</span>
                           </button>
-                          <div className="h-4 w-px bg-gray-200" />
+                          <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
                           <button
                             onClick={() => exportToCSV(trip)}
-                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-md transition-colors text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                            className="p-1.5 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 rounded-md transition-colors text-xs font-semibold flex items-center gap-1 cursor-pointer"
                             title="Export to Excel"
                           >
                             <Download className="w-3.5 h-3.5" />
@@ -842,23 +842,23 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                         <div ref={showAddColMenu === trip.id ? activeMenuRef : null} className="relative">
                           <button
                             onClick={() => setShowAddColMenu(showAddColMenu === trip.id ? null : trip.id)}
-                            className="px-2.5 py-1.5 bg-gray-100 border border-gray-200 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer shadow-sm"
+                            className="px-2.5 py-1.5 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer shadow-sm"
                           >
                             <Plus className="w-3.5 h-3.5" />
                             Add Column
                           </button>
 
                           {showAddColMenu === trip.id && (
-                            <div className="absolute right-0 top-full mt-1.5 z-30 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 min-w-[160px] animate-in fade-in duration-100">
+                            <div className="absolute right-0 top-full mt-1.5 z-30 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1.5 min-w-[160px] animate-in fade-in duration-100">
                               <button
                                 onClick={() => handleAddNormalColumn(trip.id)}
-                                className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-indigo-600 transition-colors cursor-pointer"
+                                className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
                               >
                                 Normal Column
                               </button>
                               <button
                                 onClick={() => handleAddSplitColumn(trip.id)}
-                                className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-indigo-600 transition-colors border-t border-gray-100 cursor-pointer"
+                                className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors border-t border-gray-100 dark:border-gray-700 cursor-pointer"
                               >
                                 Split Member Column
                               </button>
@@ -875,7 +875,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                               entryDescription: trip.title
                             })
                           }
-                          className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-red-100"
+                          className="p-1.5 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-red-100 dark:hover:border-red-900"
                           title="Delete Entire Trip"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -888,14 +888,14 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                   {trip.expanded && (
                     <div className="p-4">
                       {trip.entries.length === 0 ? (
-                        <div className="text-center py-8 text-gray-400">
+                        <div className="text-center py-8 text-gray-400 dark:text-gray-500">
                           <p className="text-xs">No expenses entered for this trip. Click "Add Row" to start.</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                        <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-xl">
                           <table className="w-full border-collapse">
                             <thead>
-                              <tr className="bg-gray-50/75 border-b border-gray-200">
+                              <tr className="bg-gray-50/75 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-700">
                                 {trip.columns.map((col) => (
                                   <th key={col.id} className="px-4 py-2.5 text-left min-w-[110px]">
                                     {editingColumn?.tripId === trip.id && editingColumn?.columnId === col.id ? (
@@ -908,18 +908,18 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                             if (e.key === 'Enter') saveColumnName();
                                             if (e.key === 'Escape') setEditingColumn(null);
                                           }}
-                                          className="px-2 py-1 border border-indigo-400 rounded-lg text-xs font-semibold w-24 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                                          className="px-2 py-1 border border-indigo-400 dark:border-indigo-500 rounded-lg text-xs font-semibold w-24 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
                                           autoFocus
                                         />
                                         <button
                                           onClick={saveColumnName}
-                                          className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                          className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 rounded"
                                         >
                                           <Check className="w-3 h-3" />
                                         </button>
                                         <button
                                           onClick={() => setEditingColumn(null)}
-                                          className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                                          className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                                         >
                                           <X className="w-3 h-3" />
                                         </button>
@@ -927,7 +927,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                     ) : (
                                       <div className="flex items-center justify-between group relative">
                                         <div className="flex items-center gap-1.5 min-w-0">
-                                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider truncate">
+                                          <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
                                             {col.name}
                                           </span>
                                           
@@ -935,10 +935,10 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                             <div ref={showFilterMenuId === trip.id ? activeMenuRef : null} className="relative inline-block">
                                               <button
                                                 onClick={() => setShowFilterMenuId(showFilterMenuId === trip.id ? null : trip.id)}
-                                                className={`p-1 rounded hover:bg-gray-200 transition-colors cursor-pointer ${
+                                                className={`p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer ${
                                                   spenderFilters[trip.id] && spenderFilters[trip.id] !== 'all'
-                                                    ? 'text-indigo-600 font-bold bg-indigo-50 hover:bg-indigo-100'
-                                                    : 'text-gray-400'
+                                                    ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
+                                                    : 'text-gray-400 dark:text-gray-500'
                                                 }`}
                                                 title="Filter by Spender"
                                               >
@@ -946,8 +946,8 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                               </button>
                                               
                                               {showFilterMenuId === trip.id && (
-                                                <div className="absolute left-0 mt-1.5 z-40 bg-white rounded-xl shadow-lg border border-gray-200 py-1.5 min-w-[145px] animate-in fade-in duration-100">
-                                                  <p className="px-3.5 py-1 text-xxs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1 mb-1 text-left">
+                                                <div className="absolute left-0 mt-1.5 z-40 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1.5 min-w-[145px] animate-in fade-in duration-100">
+                                                  <p className="px-3.5 py-1 text-xxs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700 pb-1 mb-1 text-left">
                                                     Filter Spender
                                                   </p>
                                                   <button
@@ -957,8 +957,8 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                     }}
                                                     className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
                                                       !spenderFilters[trip.id] || spenderFilters[trip.id] === 'all'
-                                                        ? 'text-indigo-600 bg-indigo-50 font-bold'
-                                                        : 'text-gray-700 hover:bg-gray-50'
+                                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 font-bold'
+                                                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                                                     }`}
                                                   >
                                                     All Spenders
@@ -972,8 +972,8 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                       }}
                                                       className={`w-full text-left px-3.5 py-2 text-xs font-medium transition-colors cursor-pointer truncate ${
                                                         spenderFilters[trip.id] === spender
-                                                          ? 'text-indigo-600 bg-indigo-50 font-bold'
-                                                          : 'text-gray-700 hover:bg-gray-50'
+                                                          ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 font-bold'
+                                                          : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                                                       }`}
                                                       title={spender}
                                                     >
@@ -989,7 +989,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                           <button
                                             onClick={() => startEditingColumn(trip.id, col.id, col.name)}
-                                            className="p-0.5 text-gray-400 hover:text-indigo-600"
+                                            className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400"
                                             title="Rename column"
                                           >
                                             <Edit2 className="w-3.5 h-3.5" />
@@ -1004,7 +1004,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                   columnName: col.name
                                                 })
                                               }
-                                              className="p-0.5 text-gray-400 hover:text-red-500"
+                                              className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
                                               title="Delete column"
                                             >
                                               <Trash2 className="w-3.5 h-3.5" />
@@ -1015,12 +1015,12 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                     )}
                                   </th>
                                 ))}
-                                <th className="px-4 py-2.5 text-center w-24 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                                <th className="px-4 py-2.5 text-center w-24 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                   Actions
                                 </th>
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200">
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                               {filteredEntries.map((entry) => {
                                 const isEditing = editingEntries[trip.id]?.has(entry.id);
                                 const buffer = editBuffers[trip.id]?.[entry.id];
@@ -1029,7 +1029,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                   <tr
                                     key={entry.id}
                                     className={`transition-colors ${
-                                      isEditing ? 'bg-indigo-50/40' : 'hover:bg-gray-50/50'
+                                      isEditing ? 'bg-indigo-50/40 dark:bg-indigo-950/40' : 'hover:bg-gray-50/50 dark:hover:bg-gray-700/50'
                                     }`}
                                   >
                                     {trip.columns.map((col) => {
@@ -1048,11 +1048,11 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                   onChange={(e) =>
                                                     updateBufferValue(trip.id, entry.id, col.id, e.target.value)
                                                   }
-                                                  className="w-full px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                                  className="w-full px-2 py-1.5 border border-indigo-200 dark:border-indigo-700 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                                 />
                                               ) : col.type === 'number' || col.type === 'split' ? (
                                                 <div className="relative">
-                                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xxs">
+                                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xxs">
                                                     $
                                                   </span>
                                                   <input
@@ -1063,7 +1063,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                     onChange={(e) =>
                                                       updateBufferValue(trip.id, entry.id, col.id, e.target.value)
                                                     }
-                                                    className="w-full pl-5 pr-1.5 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                                    className="w-full pl-5 pr-1.5 py-1.5 border border-indigo-200 dark:border-indigo-700 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                                   />
                                                 </div>
                                               ) : (
@@ -1073,18 +1073,18 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                   onChange={(e) =>
                                                     updateBufferValue(trip.id, entry.id, col.id, e.target.value)
                                                   }
-                                                  className="w-full px-2 py-1.5 border border-indigo-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                                  className="w-full px-2 py-1.5 border border-indigo-200 dark:border-indigo-700 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                                 />
                                               )}
                                             </div>
                                           ) : (
-                                            <span className="text-xs text-gray-800">
+                                            <span className="text-xs text-gray-800 dark:text-gray-200">
                                               {col.type === 'date' && value ? (
                                                 formatDateSafe(value)
                                               ) : col.type === 'number' || col.type === 'split' ? (
                                                 value ? `$${parseFloat(value).toFixed(2)}` : '$0.00'
                                               ) : (
-                                                value || <span className="text-gray-300 italic">—</span>
+                                                value || <span className="text-gray-300 dark:text-gray-600 italic">—</span>
                                               )}
                                             </span>
                                           )}
@@ -1108,7 +1108,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                             {trip.columns.some((c) => c.type === 'split') && (
                                               <button
                                                 onClick={() => handleSplitEqually(trip.id, entry.id)}
-                                                className="p-1 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors cursor-pointer"
+                                                className="p-1 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-lg transition-colors cursor-pointer"
                                                 title="Split amount equally"
                                               >
                                                 <Calculator className="w-3.5 h-3.5" />
@@ -1117,7 +1117,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
 
                                             <button
                                               onClick={() => cancelEditEntry(trip.id, entry.id)}
-                                              className="p-1 text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                                              className="p-1 text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors cursor-pointer"
                                               title="Cancel"
                                             >
                                               <X className="w-3.5 h-3.5" />
@@ -1127,7 +1127,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                           <>
                                             <button
                                               onClick={() => startEditEntry(trip.id, entry.id, entry.data)}
-                                              className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                              className="p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-gray-700 rounded-lg transition-colors cursor-pointer"
                                               title="Edit Row"
                                             >
                                               <Edit2 className="w-3.5 h-3.5" />
@@ -1141,7 +1141,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                   entryDescription: entry.data.expense_for || 'this expense'
                                                 })
                                               }
-                                              className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                              className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
                                               title="Delete Row"
                                             >
                                               <Trash2 className="w-3.5 h-3.5" />
@@ -1155,14 +1155,14 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                               })}
 
                               {/* Total calculation row (Default last row) */}
-                              <tr className="bg-indigo-50/50 font-bold border-t-2 border-indigo-100 text-indigo-900">
+                              <tr className="bg-indigo-50/50 dark:bg-indigo-950/60 font-bold border-t-2 border-indigo-100 dark:border-indigo-900 text-indigo-900 dark:text-indigo-200">
                                 {trip.columns.map((col, index) => {
                                   if (index === 0) {
                                     return (
                                       <td key="total-label" className="px-4 py-3 flex items-center gap-1.5">
                                         <button
                                           onClick={() => handleManualRefresh(trip.id)}
-                                          className="p-1 hover:bg-indigo-100 text-indigo-600 rounded transition-colors cursor-pointer flex items-center justify-center"
+                                          className="p-1 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 rounded transition-colors cursor-pointer flex items-center justify-center"
                                           title="Recalculate Totals"
                                         >
                                           <RotateCw
@@ -1185,7 +1185,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                   }
 
                                   return (
-                                    <td key={`total-empty-${col.id}`} className="px-4 py-3 text-xs text-gray-400 font-normal italic">
+                                    <td key={`total-empty-${col.id}`} className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 font-normal italic">
                                       —
                                     </td>
                                   );

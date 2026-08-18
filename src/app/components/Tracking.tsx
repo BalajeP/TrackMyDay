@@ -74,61 +74,61 @@ function ReminderModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 dark:border-gray-700">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">
-            <Bell className="w-5 h-5 text-indigo-600" />
+            <Bell className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             <div>
-              <h2 className="font-semibold text-gray-900">Set Reminder</h2>
-              <p className="text-xs text-gray-500">for {categoryName}</p>
+              <h2 className="font-semibold text-gray-900 dark:text-gray-100">Set Reminder</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">for {categoryName}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="w-4 h-4 text-gray-500" />
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+            <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
         <div className="p-5 space-y-5">
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Reminder Title</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Reminder Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder={`e.g., Next ${categoryName} due...`}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
               autoFocus
             />
           </div>
 
           {/* Calendar */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select Date</label>
-            <div className="border border-gray-200 rounded-lg p-3 bg-white">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Date</label>
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-900">
               <div className="flex items-center justify-between mb-2">
                 <button
                   type="button"
                   onClick={() => setViewMonth(subMonths(viewMonth, 1))}
-                  className="p-1 hover:bg-gray-100 rounded"
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
                 >
-                  <ChevronLeft className="w-4 h-4 text-gray-600" />
+                  <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-300" />
                 </button>
-                <span className="text-sm font-semibold text-gray-800">
+                <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                   {format(viewMonth, 'MMMM yyyy')}
                 </span>
                 <button
                   type="button"
                   onClick={() => setViewMonth(addMonths(viewMonth, 1))}
-                  className="p-1 hover:bg-gray-100 rounded"
+                  className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded"
                 >
-                  <ChevronRight className="w-4 h-4 text-gray-600" />
+                  <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />
                 </button>
               </div>
               <div className="grid grid-cols-7 gap-1">
                 {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
-                  <div key={d} className="text-center text-xs font-medium text-gray-500 py-1">
+                  <div key={d} className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 py-1">
                     {d}
                   </div>
                 ))}
@@ -148,8 +148,8 @@ function ReminderModal({
                       className={`
                         aspect-square rounded-lg text-sm font-medium transition-colors
                         ${isSelected ? 'bg-indigo-600 text-white' : ''}
-                        ${!isSelected && isToday ? 'bg-indigo-50 text-indigo-600' : ''}
-                        ${!isSelected && !isToday ? 'hover:bg-gray-100 text-gray-700' : ''}
+                        ${!isSelected && isToday ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400' : ''}
+                        ${!isSelected && !isToday ? 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200' : ''}
                       `}
                     >
                       {format(day, 'd')}
@@ -162,12 +162,12 @@ function ReminderModal({
 
           {/* Time */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Select Time</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Select Time</label>
             <input
               type="time"
               value={time}
               onChange={(e) => setTime(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
+              className="w-full px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
             />
           </div>
         </div>
@@ -176,7 +176,7 @@ function ReminderModal({
         <div className="px-5 pb-5 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-xl hover:bg-gray-200 transition-colors"
+            className="flex-1 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           >
             Cancel
           </button>
@@ -501,8 +501,8 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
       </div>
 
       {/* Add new category */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Tracking Category</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Add New Tracking Category</h2>
         <div className="flex gap-3">
           <input
             type="text"
@@ -510,7 +510,7 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
             onChange={(e) => setNewCategoryName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addCategory()}
             placeholder="e.g., Cylinder, Haircut, Car Service..."
-            className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
+            className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
           />
           <button
             onClick={addCategory}
@@ -553,32 +553,32 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
               setDraggedCategoryId(null);
               setCanDragId(null);
             }}
-            className={`bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-200 ${
+            className={`bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden transition-all duration-200 ${
               draggedCategoryId === category.id ? 'opacity-40 border-dashed border-indigo-400' : ''
             }`}
           >
             {/* Category header */}
-            <div className="flex items-center justify-between px-5 py-4 bg-gray-50 border-b border-gray-200 group/header">
+            <div className="flex items-center justify-between px-5 py-4 bg-gray-50 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-700 group/header">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <div
                   onMouseDown={() => setCanDragId(category.id)}
                   onMouseUp={() => setCanDragId(null)}
-                  className="opacity-0 group-hover/header:opacity-100 transition-opacity cursor-grab flex-shrink-0 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-200"
+                  className="opacity-0 group-hover/header:opacity-100 transition-opacity cursor-grab flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                   title="Drag to reorder"
                 >
                   <GripVertical className="w-4 h-4" />
                 </div>
                 <button
                   onClick={() => toggleExpanded(category.id)}
-                  className="flex items-center gap-2 text-gray-900 font-semibold hover:text-indigo-600 transition-colors min-w-0"
+                  className="flex items-center gap-2 text-gray-900 dark:text-gray-100 font-semibold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors min-w-0"
                 >
                   {category.expanded ? (
-                    <ChevronDown className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                    <ChevronDown className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                   ) : (
-                    <ChevronRight className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                    <ChevronRight className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
                   )}
                   <span className="truncate">{category.name}</span>
-                  <span className="text-xs text-gray-500 font-normal ml-1">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 font-normal ml-1">
                     ({category.entries.length} {category.entries.length === 1 ? 'entry' : 'entries'})
                   </span>
                 </button>
@@ -595,7 +595,7 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                     </button>
                     <button
                       onClick={() => addColumn(category.id)}
-                      className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors flex items-center gap-1.5 text-xs font-medium"
+                      className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5 text-xs font-medium"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Add Column
@@ -604,7 +604,7 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                 )}
                 <button
                   onClick={() => setConfirmDelete({ type: 'category', categoryId: category.id, categoryName: category.name })}
-                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  className="p-1.5 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -615,14 +615,14 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
             {category.expanded && (
               <div className="p-5">
                 {category.entries.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
+                  <div className="text-center py-8 text-gray-400 dark:text-gray-500">
                     <p className="text-sm">No entries yet. Click "Add Entry" to start tracking.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-gray-200">
+                        <tr className="border-b border-gray-200 dark:border-gray-700">
 
                           {category.columns.map((col) => (
                             <th key={col.id} className="px-3 py-2 text-left">
@@ -636,22 +636,22 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                                       if (e.key === 'Enter') saveColumnName();
                                       if (e.key === 'Escape') cancelEditingColumn();
                                     }}
-                                    className="px-2 py-1 border border-indigo-400 rounded text-xs font-medium w-24 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                    className="px-2 py-1 border border-indigo-400 dark:border-indigo-500 rounded text-xs font-medium w-24 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                     autoFocus
                                   />
-                                  <button onClick={saveColumnName} className="p-1 text-green-600 hover:bg-green-50 rounded">
+                                  <button onClick={saveColumnName} className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 rounded">
                                     <Check className="w-3 h-3" />
                                   </button>
-                                  <button onClick={cancelEditingColumn} className="p-1 text-gray-500 hover:bg-gray-100 rounded">
+                                  <button onClick={cancelEditingColumn} className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
                                     <X className="w-3 h-3" />
                                   </button>
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-2 group">
-                                  <span className="text-xs font-medium text-gray-600">{col.name}</span>
+                                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{col.name}</span>
                                   <button
                                     onClick={() => startEditingColumn(category.id, col.id, col.name)}
-                                    className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-indigo-600 transition-opacity"
+                                    className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-opacity"
                                   >
                                     <Edit2 className="w-3 h-3" />
                                   </button>
@@ -664,7 +664,7 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                                         columnId: col.id,
                                         columnName: col.name,
                                       })}
-                                      className="opacity-0 group-hover:opacity-100 p-0.5 text-red-400 hover:text-red-600 transition-opacity"
+                                      className="opacity-0 group-hover:opacity-100 p-0.5 text-red-400 hover:text-red-600 dark:hover:text-red-400 transition-opacity"
                                     >
                                       <Trash2 className="w-3 h-3" />
                                     </button>
@@ -674,7 +674,7 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                             </th>
                           ))}
                           {/* Actions column header */}
-                          <th className="px-3 py-2 w-20 text-xs font-medium text-gray-500 text-center">Actions</th>
+                          <th className="px-3 py-2 w-20 text-xs font-medium text-gray-500 dark:text-gray-400 text-center">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -686,12 +686,12 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                           return (
                             <tr
                               key={entry.id}
-                              className={`border-b border-gray-100 last:border-0 transition-colors ${
+                              className={`border-b border-gray-100 dark:border-gray-700/60 last:border-0 transition-colors ${
                                 isEditing
-                                  ? 'bg-indigo-50/60'
+                                  ? 'bg-indigo-50/60 dark:bg-indigo-950/60'
                                   : isNew
-                                  ? 'bg-indigo-50'
-                                  : 'hover:bg-gray-50'
+                                  ? 'bg-indigo-50 dark:bg-indigo-950/40'
+                                  : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
                               }`}
                             >
 
@@ -704,15 +704,15 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                                       type={col.type}
                                       value={entry.data[col.id] || ''}
                                       onChange={(e) => updateEntryData(category.id, entry.id, col.id, e.target.value)}
-                                      className="w-full min-w-[100px] px-2 py-1.5 border border-indigo-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                                      className="w-full min-w-[100px] px-2 py-1.5 border border-indigo-300 dark:border-indigo-600 rounded-lg text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                     />
                                   ) : (
-                                    <span className="text-sm text-gray-800 block px-1 py-1">
+                                    <span className="text-sm text-gray-800 dark:text-gray-200 block px-1 py-1">
                                       {entry.data[col.id]
                                         ? col.type === 'date' && entry.data[col.id]
                                           ? format(new Date(entry.data[col.id]), 'dd MMM yyyy')
                                           : entry.data[col.id]
-                                        : <span className="text-gray-300 italic">—</span>}
+                                        : <span className="text-gray-300 dark:text-gray-600 italic">—</span>}
                                     </span>
                                   )}
                                 </td>
@@ -725,7 +725,7 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                                     <button
                                       onClick={() => saveEntry(entry.id)}
                                       title="Save entry"
-                                      className="p-1.5 text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors"
+                                      className="p-1.5 text-white bg-green-500 dark:bg-green-600 hover:bg-green-600 dark:hover:bg-green-500 rounded-lg transition-colors"
                                     >
                                       <Check className="w-3.5 h-3.5" />
                                     </button>
@@ -733,7 +733,7 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                                     <button
                                       onClick={() => startEditEntry(entry.id)}
                                       title="Edit entry"
-                                      className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                      className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
                                     >
                                       <Edit2 className="w-3.5 h-3.5" />
                                     </button>
@@ -747,7 +747,7 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                                         entryId: entry.id,
                                       })}
                                       title="Delete entry"
-                                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                      className="p-1.5 text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -767,8 +767,8 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
         ))}
 
         {filteredCategories.length === 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-            <p className="text-gray-400">No tracking categories yet. Add one above to get started!</p>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+            <p className="text-gray-400 dark:text-gray-500">No tracking categories yet. Add one above to get started!</p>
           </div>
         )}
       </div>

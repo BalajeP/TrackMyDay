@@ -155,10 +155,10 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
         <div
           ref={panelRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, width: 220, zIndex: 9999 }}
-          className="bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden"
+          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden"
         >
           {/* Header */}
-          <div className={`px-3 py-2 border-b border-gray-100 flex items-center justify-between ${styles.header}`}>
+          <div className={`px-3 py-2 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between ${styles.header}`}>
             <p className="text-xs font-semibold">{label} options</p>
             <button onClick={() => setOpen(false)} className="p-0.5 hover:opacity-60 rounded">
               <X className="w-3.5 h-3.5" />
@@ -166,7 +166,7 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
           </div>
 
           {/* Search bar */}
-          <div className="p-2 border-b border-gray-100 bg-gray-50/50">
+          <div className="p-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
             <div className="relative flex items-center">
               <Search className="w-3.5 h-3.5 absolute left-2 text-gray-400 pointer-events-none" />
               <input
@@ -174,12 +174,12 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
                 placeholder="Search options…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-7 pr-6 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                className="w-full pl-7 pr-6 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 text-gray-400 hover:text-gray-600 p-0.5"
+                  className="absolute right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -188,14 +188,14 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
           </div>
 
           {/* Add input */}
-          <div className="p-2 border-b border-gray-100 flex gap-1.5">
+          <div className="p-2 border-b border-gray-100 dark:border-gray-700 flex gap-1.5 bg-white dark:bg-gray-800">
             <input
               type="text"
               placeholder="Add option…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-              className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
             />
             <button
               onClick={handleAdd}
@@ -207,18 +207,18 @@ function ColumnListManager({ label, color, options, onAdd, onDelete }: {
           </div>
 
           {/* List */}
-          <div style={{ maxHeight: pos.maxListHeight }} className="overflow-y-auto">
+          <div style={{ maxHeight: pos.maxListHeight }} className="overflow-y-auto bg-white dark:bg-gray-800">
             {filteredOptions.length === 0 && (
-              <p className="px-3 py-4 text-xs text-gray-400 italic text-center">
+              <p className="px-3 py-4 text-xs text-gray-400 dark:text-gray-500 italic text-center">
                 {options.length === 0 ? 'No items yet' : 'No matching items'}
               </p>
             )}
             {filteredOptions.map((opt) => (
-              <div key={opt} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 group">
-                <span className="text-xs text-gray-700 flex-1 min-w-0 truncate" title={opt}>{opt}</span>
+              <div key={opt} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 group">
+                <span className="text-xs text-gray-700 dark:text-gray-200 flex-1 min-w-0 truncate" title={opt}>{opt}</span>
                 <button
                   onClick={() => onDelete(opt)}
-                  className="flex-shrink-0 ml-2 p-1 text-red-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition-all"
+                  className="flex-shrink-0 ml-2 p-1 text-red-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded opacity-0 group-hover:opacity-100 transition-all"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -276,8 +276,8 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
         onClick={() => setOpen((o) => !o)}
         className={`w-full flex items-center justify-between gap-1 px-2.5 py-2 text-xs rounded-lg border transition-colors text-left ${
           value
-            ? 'bg-white border-gray-300 text-gray-800 hover:border-indigo-400'
-            : 'bg-gray-50 border-dashed border-gray-300 text-gray-400 hover:border-indigo-400'
+            ? 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-200 hover:border-indigo-400'
+            : 'bg-gray-50 dark:bg-gray-900 border-dashed border-gray-300 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-indigo-400'
         }`}
       >
         <span className="truncate">{value || placeholder || 'Select…'}</span>
@@ -288,10 +288,10 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
         <div
           ref={panelRef}
           style={{ position: 'fixed', top: pos.top, left: pos.left, width: 220, zIndex: 9999 }}
-          className="bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden"
+          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl overflow-hidden"
         >
           {/* Search bar */}
-          <div className="p-2 border-b border-gray-100 bg-gray-50/50">
+          <div className="p-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
             <div className="relative flex items-center">
               <Search className="w-3.5 h-3.5 absolute left-2 text-gray-400 pointer-events-none" />
               <input
@@ -300,12 +300,12 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 autoFocus
-                className="w-full pl-7 pr-6 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                className="w-full pl-7 pr-6 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2 text-gray-400 hover:text-gray-600 p-0.5"
+                  className="absolute right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -313,17 +313,17 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
             </div>
           </div>
 
-          <div style={{ maxHeight: pos.maxListHeight }} className="overflow-y-auto">
+          <div style={{ maxHeight: pos.maxListHeight }} className="overflow-y-auto bg-white dark:bg-gray-800">
             {value && !searchQuery && (
               <button
                 onClick={() => { onChange(''); setOpen(false); }}
-                className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-50 border-b border-gray-100 flex items-center gap-1"
+                className="w-full text-left px-3 py-2 text-xs text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 border-b border-gray-100 dark:border-gray-700 flex items-center gap-1"
               >
                 <X className="w-3 h-3" /> Clear
               </button>
             )}
             {filteredOptions.length === 0 && (
-              <p className="px-3 py-3 text-xs text-gray-400 italic text-center">
+              <p className="px-3 py-3 text-xs text-gray-400 dark:text-gray-500 italic text-center">
                 {options.length === 0 ? 'No items — add below' : 'No matching items'}
               </p>
             )}
@@ -332,8 +332,8 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
                 key={opt}
                 className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors group ${
                   opt === value
-                    ? 'bg-indigo-50 text-indigo-700 font-medium'
-                    : 'text-gray-700 hover:bg-indigo-50 hover:text-indigo-700'
+                    ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-medium'
+                    : 'text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-gray-700 hover:text-indigo-700 dark:hover:text-indigo-300'
                 }`}
               >
                 <button
@@ -350,7 +350,7 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
                       e.stopPropagation();
                       onDeleteOption(opt);
                     }}
-                    className="flex-shrink-0 p-1 text-gray-400 hover:text-red-600 rounded hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100"
+                    className="flex-shrink-0 p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors opacity-0 group-hover:opacity-100"
                     title={`Delete ${opt}`}
                   >
                     <Trash2 className="w-3 h-3" />
@@ -359,14 +359,14 @@ function MealDropdown({ value, options, placeholder, onChange, onAddOption, onDe
               </div>
             ))}
           </div>
-          <div className="border-t border-gray-100 p-2 flex gap-1.5 bg-gray-50">
+          <div className="border-t border-gray-100 dark:border-gray-700 p-2 flex gap-1.5 bg-gray-50 dark:bg-gray-900/60">
             <input
               type="text"
               placeholder="Add new item…"
               value={newItem}
               onChange={(e) => setNewItem(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-              className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+              className="flex-1 min-w-0 px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
             />
             <button
               onClick={handleAdd}
@@ -511,42 +511,42 @@ export default function MealSchedule({ activePerson, partner1Name, partner2Name,
       {/* Week nav */}
       <div className="flex items-center gap-2 flex-wrap">
         <button onClick={() => setWeekStart(subWeeks(weekStart, 1))}
-          className="p-2 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors">
-          <ChevronLeft className="w-4 h-4 text-gray-600" />
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors">
+          <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-300" />
         </button>
-        <span className="text-sm font-semibold text-gray-800 min-w-[180px] text-center">{weekLabel}</span>
+        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 min-w-[180px] text-center">{weekLabel}</span>
         <button onClick={() => setWeekStart(addWeeks(weekStart, 1))}
-          className="p-2 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors">
-          <ChevronRight className="w-4 h-4 text-gray-600" />
+          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors">
+          <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />
         </button>
         <button onClick={() => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-          className="px-3 py-1.5 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors">
+          className="px-3 py-1.5 text-xs bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors">
           This week
         </button>
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 bg-white border border-gray-100 rounded-xl px-4 py-2.5">
-        <span className="font-semibold text-gray-600 mr-1">Status:</span>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2.5">
+        <span className="font-semibold text-gray-600 dark:text-gray-300 mr-1">Status:</span>
         <span className="flex items-center gap-1.5"><span className="w-5 h-5 bg-green-500 rounded-md flex items-center justify-center"><Check className="w-3 h-3 text-white" /></span>Cooked</span>
         <span className="flex items-center gap-1.5"><span className="w-5 h-5 bg-orange-500 rounded-md flex items-center justify-center"><Pencil className="w-3 h-3 text-white" /></span>Changed</span>
         <span className="flex items-center gap-1.5"><span className="w-5 h-5 bg-purple-500 rounded-md flex items-center justify-center"><UtensilsCrossed className="w-3 h-3 text-white" /></span>Ate out</span>
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr>
-                <th className="sticky left-0 z-20 bg-gray-50 border-r border-b border-gray-200 px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[100px] align-top">
+                <th className="sticky left-0 z-20 bg-gray-50 dark:bg-gray-900 border-r border-b border-gray-200 dark:border-gray-700 px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide min-w-[100px] align-top">
                   Day
                 </th>
                 {MEAL_COLUMNS.map((col) => {
                   const styles = COL_STYLES[col.color];
                   return (
                     <th key={col.key}
-                      className={`border-b border-r border-gray-200 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide min-w-[160px] align-top ${styles.header}`}>
+                      className={`border-b border-r border-gray-200 dark:border-gray-700 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide min-w-[160px] align-top ${styles.header}`}>
                       <span>{col.label}</span>
                       <ColumnListManager
                         label={col.label} color={col.color}
@@ -563,15 +563,15 @@ export default function MealSchedule({ activePerson, partner1Name, partner2Name,
               {weekDays.map((day, i) => {
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const todayRow = isToday(day);
-                const rowBg = todayRow ? 'bg-indigo-50/50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40';
-                const stickyBg = todayRow ? 'bg-indigo-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+                const rowBg = todayRow ? 'bg-indigo-50/50 dark:bg-indigo-950/40' : i % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/40 dark:bg-gray-800/60';
+                const stickyBg = todayRow ? 'bg-indigo-50 dark:bg-indigo-950/80' : i % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-900';
                 return (
-                  <tr key={dateStr} className={`${rowBg} hover:bg-indigo-50/30 transition-colors`}>
-                    <td className={`sticky left-0 z-10 border-r border-b border-gray-100 px-4 py-3 align-top ${stickyBg}`}>
-                      <div className={`font-semibold text-sm ${todayRow ? 'text-indigo-700' : 'text-gray-800'}`}>
+                  <tr key={dateStr} className={`${rowBg} hover:bg-indigo-50/30 dark:hover:bg-gray-700/50 transition-colors`}>
+                    <td className={`sticky left-0 z-10 border-r border-b border-gray-100 dark:border-gray-700 px-4 py-3 align-top ${stickyBg}`}>
+                      <div className={`font-semibold text-sm ${todayRow ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-800 dark:text-gray-200'}`}>
                         {format(day, 'EEEE')}
                       </div>
-                      <div className={`text-xs mt-0.5 ${todayRow ? 'text-indigo-500' : 'text-gray-400'}`}>
+                      <div className={`text-xs mt-0.5 ${todayRow ? 'text-indigo-500 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500'}`}>
                         {format(day, 'MMM d')}
                       </div>
                       {todayRow && (
@@ -581,7 +581,7 @@ export default function MealSchedule({ activePerson, partner1Name, partner2Name,
                       )}
                     </td>
                     {MEAL_COLUMNS.map((col) => (
-                      <td key={col.key} className="border-r border-b border-gray-100 align-top">
+                      <td key={col.key} className="border-r border-b border-gray-100 dark:border-gray-700 align-top">
                         <MealCell
                           entry={getEntry(dateStr, col.key)}
                           options={optionsByMeal[col.key]}

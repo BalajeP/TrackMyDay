@@ -831,14 +831,14 @@ export default function Expenditure({
   return (
     <div className="space-y-6">
       {/* Top Sub-Tab Switcher Component */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 pb-4">
-        <div className="flex items-center p-1 bg-gray-100/80 rounded-xl border border-gray-200/60">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+        <div className="flex items-center p-1 bg-gray-100/80 dark:bg-gray-800 rounded-xl border border-gray-200/60 dark:border-gray-700">
           <button
             onClick={() => setExpenseTab('daily')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
               expenseTab === 'daily'
-                ? 'bg-white text-indigo-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
             }`}
           >
             <Receipt className="w-4 h-4" />
@@ -848,8 +848,8 @@ export default function Expenditure({
             onClick={() => setExpenseTab('trip')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
               expenseTab === 'trip'
-                ? 'bg-white text-indigo-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
             }`}
           >
             <Plane className="w-4 h-4" />
@@ -863,10 +863,10 @@ export default function Expenditure({
           disabled={!hasUnsavedChanges}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
             showSaved
-              ? 'bg-green-100 text-green-700 border border-green-300'
+              ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-800'
               : hasUnsavedChanges
                 ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed border border-transparent dark:border-gray-700'
           }`}
         >
           <Save className="w-4 h-4" />
@@ -877,15 +877,15 @@ export default function Expenditure({
       {/* Daily Expenses View */}
       <div className={expenseTab === 'daily' ? 'space-y-6' : 'hidden'}>
         {/* Date & Time Navigation Bar (Today, Weekly, Monthly, Yearly) */}
-        <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-3">
+        <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-700 pb-3">
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={() => setDateFilterType('today')}
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   dateFilterType === 'today'
                     ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 Today
@@ -895,7 +895,7 @@ export default function Expenditure({
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   dateFilterType === 'this_week'
                     ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 This week
@@ -905,7 +905,7 @@ export default function Expenditure({
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   dateFilterType === 'this_month'
                     ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 This month
@@ -915,7 +915,7 @@ export default function Expenditure({
                 className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                   dateFilterType === 'this_year'
                     ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 This year
@@ -924,18 +924,18 @@ export default function Expenditure({
 
             <div className="flex items-center gap-2 flex-wrap">
               {/* Month & Year Selectors */}
-              <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs">
-                <Calendar className="w-3.5 h-3.5 text-gray-500" />
+              <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-xs">
+                <Calendar className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
                 <select
                   value={selectedMonth}
                   onChange={(e) => {
                     setSelectedMonth(e.target.value);
                     setDateFilterType('custom');
                   }}
-                  className="bg-transparent font-medium text-gray-800 focus:outline-none cursor-pointer"
+                  className="bg-transparent font-medium text-gray-800 dark:text-gray-200 focus:outline-none cursor-pointer"
                 >
                   {MONTHS.map((m) => (
-                    <option key={m.value} value={m.value}>
+                    <option key={m.value} value={m.value} className="dark:bg-gray-900 dark:text-white">
                       {m.label}
                     </option>
                   ))}
@@ -946,10 +946,10 @@ export default function Expenditure({
                     setSelectedYear(e.target.value);
                     setDateFilterType('custom');
                   }}
-                  className="bg-transparent font-medium text-gray-800 focus:outline-none cursor-pointer border-l border-gray-200 pl-1.5"
+                  className="bg-transparent font-medium text-gray-800 dark:text-gray-200 focus:outline-none cursor-pointer border-l border-gray-200 dark:border-gray-700 pl-1.5"
                 >
                   {YEARS.map((y) => (
-                    <option key={y} value={y}>
+                    <option key={y} value={y} className="dark:bg-gray-900 dark:text-white">
                       {y}
                     </option>
                   ))}
@@ -960,12 +960,12 @@ export default function Expenditure({
               <div ref={categoryDropdownRef} className="relative">
                 <button
                   onClick={() => setShowCategoryDropdown((v) => !v)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg text-xs font-semibold text-indigo-700 transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs font-semibold text-indigo-700 dark:text-indigo-300 transition-colors"
                 >
-                  <Filter className="w-3.5 h-3.5 text-indigo-600" />
+                  <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                   <span>Category Menu</span>
                   {selectedCategories.length > 0 && (
-                    <span className="bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                    <span className="bg-indigo-600 dark:bg-indigo-500 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
                       {selectedCategories.length}
                     </span>
                   )}
@@ -978,13 +978,13 @@ export default function Expenditure({
 
                 {/* Category Menu Items Dropdown Panel */}
                 {showCategoryDropdown && (
-                  <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-xl shadow-2xl z-30 overflow-hidden space-y-2">
+                  <div className="absolute right-0 mt-1.5 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-30 overflow-hidden space-y-2">
                     {/* Header */}
-                    <div className="p-2.5 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-                      <span className="text-xs font-bold text-gray-700">Category Menu Items</span>
+                    <div className="p-2.5 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-900/80">
+                      <span className="text-xs font-bold text-gray-700 dark:text-gray-200">Category Menu Items</span>
                       <button
                         onClick={() => toggleCategoryFilter('all')}
-                        className="text-[11px] text-indigo-600 hover:underline font-semibold"
+                        className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold"
                       >
                         {selectedCategories.length === 0 ? 'All Selected' : 'Clear All'}
                       </button>
@@ -993,18 +993,18 @@ export default function Expenditure({
                     {/* Search Input Bar */}
                     <div className="px-2.5 pt-1">
                       <div className="relative">
-                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500" />
                         <input
                           type="text"
                           placeholder="Search menu items..."
                           value={categorySearch}
                           onChange={(e) => setCategorySearch(e.target.value)}
-                          className="w-full pl-8 pr-7 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-gray-50/50"
+                          className="w-full pl-8 pr-7 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-gray-50/50 dark:bg-gray-900 text-gray-900 dark:text-white"
                         />
                         {categorySearch && (
                           <button
                             onClick={() => setCategorySearch('')}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                           >
                             <X className="w-3 h-3" />
                           </button>
@@ -1020,7 +1020,7 @@ export default function Expenditure({
                         value={newCategoryInput}
                         onChange={(e) => setNewCategoryInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-                        className="flex-1 min-w-0 px-2.5 py-1 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        className="flex-1 min-w-0 px-2.5 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                       />
                       <button
                         onClick={handleAddCategory}
@@ -1033,9 +1033,9 @@ export default function Expenditure({
                     </div>
 
                     {/* Category Items List with Checkbox + Inline Edit Spelling + Delete Confirmation */}
-                    <div className="max-h-56 overflow-y-auto px-1 divide-y divide-gray-50">
+                    <div className="max-h-56 overflow-y-auto px-1 divide-y divide-gray-50 dark:divide-gray-700/50">
                       {filteredCategoryList.length === 0 ? (
-                        <p className="px-3 py-3 text-xs text-gray-400 italic text-center">
+                        <p className="px-3 py-3 text-xs text-gray-400 dark:text-gray-500 italic text-center">
                           No matching menu items
                         </p>
                       ) : (
@@ -1046,7 +1046,7 @@ export default function Expenditure({
                           return (
                             <div
                               key={cat}
-                              className="flex items-center justify-between px-2 py-1.5 hover:bg-indigo-50/60 rounded-lg group text-xs transition-colors"
+                              className="flex items-center justify-between px-2 py-1.5 hover:bg-indigo-50/60 dark:hover:bg-gray-700/60 rounded-lg group text-xs transition-colors"
                             >
                               {isEditing ? (
                                 <div className="flex items-center gap-1 flex-1 py-0.5">
@@ -1063,18 +1063,18 @@ export default function Expenditure({
                                       e.key === 'Enter' && handleSaveEditCategory()
                                     }
                                     autoFocus
-                                    className="flex-1 px-2 py-1 text-xs border border-indigo-300 rounded focus:outline-none"
+                                    className="flex-1 px-2 py-1 text-xs border border-indigo-300 dark:border-indigo-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none"
                                   />
                                   <button
                                     onClick={handleSaveEditCategory}
-                                    className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                    className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 rounded"
                                     title="Save spelling"
                                   >
                                     <Check className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => setEditingCategory(null)}
-                                    className="p-1 text-gray-400 hover:bg-gray-100 rounded"
+                                    className="p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                                     title="Cancel edit"
                                   >
                                     <X className="w-3 h-3" />
@@ -1087,12 +1087,12 @@ export default function Expenditure({
                                       type="checkbox"
                                       checked={isChecked}
                                       onChange={() => toggleCategoryFilter(cat)}
-                                      className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                      className="w-3.5 h-3.5 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500 bg-white dark:bg-gray-900"
                                     />
-                                    <span className="truncate text-gray-700 font-medium">{cat}</span>
+                                    <span className="truncate text-gray-700 dark:text-gray-200 font-medium">{cat}</span>
                                   </label>
 
-                                  <span className="text-[10px] text-gray-400 font-normal ml-auto mr-1.5 flex-shrink-0" title={`Last used: ${getCategoryLastUsed(cat)}`}>
+                                  <span className="text-[10px] text-gray-400 dark:text-gray-500 font-normal ml-auto mr-1.5 flex-shrink-0" title={`Last used: ${getCategoryLastUsed(cat)}`}>
                                     {getCategoryLastUsed(cat)}
                                   </span>
 
@@ -1103,7 +1103,7 @@ export default function Expenditure({
                                         handleStartEditCategory(cat);
                                       }}
                                       title="Edit spelling"
-                                      className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
+                                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-gray-700 rounded"
                                     >
                                       <Edit2 className="w-3 h-3" />
                                     </button>
@@ -1113,7 +1113,7 @@ export default function Expenditure({
                                         promptDeleteCategory(cat);
                                       }}
                                       title="Remove category item"
-                                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded"
                                     >
                                       <Trash2 className="w-3 h-3" />
                                     </button>
@@ -1127,8 +1127,8 @@ export default function Expenditure({
                     </div>
 
                     {/* Footer */}
-                    <div className="p-2 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-                      <span className="text-[11px] text-gray-400">
+                    <div className="p-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/80 flex items-center justify-between">
+                      <span className="text-[11px] text-gray-400 dark:text-gray-500">
                         {selectedCategories.length} selected
                       </span>
                       <button
@@ -1145,15 +1145,15 @@ export default function Expenditure({
           </div>
 
           {/* Active Filter Chips (Chipset) & Last Used Time Bar */}
-          <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-100 mt-1">
+          <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-100 dark:border-gray-700 mt-1">
             <div className="flex items-center gap-2 flex-wrap text-xs">
-              <span className="font-semibold text-gray-500 flex items-center gap-1">
-                <Tag className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="font-semibold text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                <Tag className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                 <span>Selected Chipset:</span>
               </span>
 
               {selectedCategories.length === 0 ? (
-                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
                   All Categories
                 </span>
               ) : (
@@ -1176,7 +1176,7 @@ export default function Expenditure({
 
                   <button
                     onClick={() => toggleCategoryFilter('all')}
-                    className="text-[11px] text-gray-500 hover:text-indigo-600 underline font-medium ml-1"
+                    className="text-[11px] text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 underline font-medium ml-1"
                   >
                     Clear All
                   </button>
@@ -1185,10 +1185,10 @@ export default function Expenditure({
             </div>
 
             {/* Last Used Time Display under filter */}
-            <div className="flex items-center gap-1.5 text-xs text-gray-600 bg-indigo-50/70 border border-indigo-100 px-3 py-1 rounded-lg shadow-2xs">
-              <Clock className="w-3.5 h-3.5 text-indigo-600" />
-              <span className="font-medium text-gray-500">Last used time:</span>
-              <span className="font-bold text-indigo-950">{lastUsedFilterTime}</span>
+            <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300 bg-indigo-50/70 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900 px-3 py-1 rounded-lg shadow-2xs">
+              <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span className="font-medium text-gray-500 dark:text-gray-400">Last used time:</span>
+              <span className="font-bold text-indigo-950 dark:text-indigo-200">{lastUsedFilterTime}</span>
             </div>
           </div>
         </div>
@@ -1196,14 +1196,14 @@ export default function Expenditure({
         {/* SIDE-BY-SIDE ROW: Donut SVG Chart Dashboard on Left & Add Expense Card Button on Right */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
           {/* Dashboard Circle Chart Panel (3 cols) with PDF Export Button in TOP RIGHT CORNER */}
-          <div className="lg:col-span-3 bg-white border border-gray-200 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6 relative">
+          <div className="lg:col-span-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6 relative">
             {/* PDF Export Button positioned cleanly in the Top Right Corner */}
             <button
               onClick={() => setShowPdfPreviewModal(true)}
-              className="absolute top-3.5 right-3.5 z-10 p-1.5 text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
+              className="absolute top-3.5 right-3.5 z-10 p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg transition-colors text-xs font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
               title="Generate PDF Report"
             >
-              <FileText className="w-3.5 h-3.5 text-red-600" />
+              <FileText className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
               <span>PDF</span>
             </button>
 
@@ -1215,7 +1215,8 @@ export default function Expenditure({
                   cy="85"
                   r="65"
                   fill="transparent"
-                  stroke="#F3F4F6"
+                  stroke="currentColor"
+                  className="text-gray-100 dark:text-gray-700"
                   strokeWidth="20"
                 />
                 {chartSegments.map((segment) => (
@@ -1240,22 +1241,22 @@ export default function Expenditure({
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none p-2">
                 {hoveredCategory ? (
                   <>
-                    <span className="text-[11px] font-bold text-gray-500 truncate max-w-[110px]">
+                    <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 truncate max-w-[110px]">
                       {hoveredCategory}
                     </span>
-                    <span className="text-sm font-extrabold text-indigo-600">
+                    <span className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400">
                       ${(categoryTotals[hoveredCategory] || 0).toFixed(2)}
                     </span>
-                    <span className="text-[10px] text-gray-400">
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">
                       {((categoryTotals[hoveredCategory] / (totalSpentAll || 1)) * 100).toFixed(1)}%
                     </span>
                   </>
                 ) : (
                   <>
-                    <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                    <span className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                       Total Spent
                     </span>
-                    <span className="text-base font-extrabold text-gray-900">
+                    <span className="text-base font-extrabold text-gray-900 dark:text-gray-100">
                       ${totalSpentAll.toFixed(2)}
                     </span>
                   </>
@@ -1265,19 +1266,19 @@ export default function Expenditure({
 
             {/* Chart Legend with Hover Tooltips */}
             <div className="flex-1 w-full min-w-0 pr-12 sm:pr-14">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
-                <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <PieChart className="w-4 h-4 text-indigo-600" />
+              <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-2 mb-3">
+                <h4 className="text-xs font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <PieChart className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                   <span>Category Expenses Breakdown</span>
                 </h4>
 
-                <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">
                   ${totalSpentAll.toFixed(2)}
                 </span>
               </div>
 
               {chartSegments.length === 0 ? (
-                <p className="text-xs text-gray-400 italic py-4 text-center">
+                <p className="text-xs text-gray-400 dark:text-gray-500 italic py-4 text-center">
                   No expense data available for this period.
                 </p>
               ) : (
@@ -1289,8 +1290,8 @@ export default function Expenditure({
                       onMouseLeave={() => setHoveredCategory(null)}
                       className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
                         hoveredCategory === segment.category
-                          ? 'bg-indigo-50 border-indigo-300 shadow-sm scale-102'
-                          : 'bg-gray-50/70 border-gray-100 hover:bg-gray-100'
+                          ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 shadow-sm scale-102'
+                          : 'bg-gray-50/70 dark:bg-gray-900/60 border-gray-100 dark:border-gray-700/80 hover:bg-gray-100 dark:hover:bg-gray-700/60'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
@@ -1299,17 +1300,17 @@ export default function Expenditure({
                           style={{ backgroundColor: segment.color }}
                         />
                         <span
-                          className="text-xs font-semibold text-gray-800 truncate"
+                          className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate"
                           title={`${segment.category}: $${segment.amount.toFixed(2)}`}
                         >
                           {segment.category}
                         </span>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <span className="text-xs font-bold text-gray-900 block">
+                        <span className="text-xs font-bold text-gray-900 dark:text-gray-100 block">
                           ${segment.amount.toFixed(2)}
                         </span>
-                        <span className="text-[10px] text-gray-400 block">
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 block">
                           {segment.percentage.toFixed(1)}%
                         </span>
                       </div>
@@ -1323,13 +1324,13 @@ export default function Expenditure({
           {/* Add Expense Card Box (1 col) - Placed side-by-side with Dashboard */}
           <button
             onClick={handleOpenAddModal}
-            className="lg:col-span-1 min-h-[170px] bg-gradient-to-br from-indigo-50/80 to-purple-50/80 hover:from-indigo-100 hover:to-purple-100 border-2 border-dashed border-indigo-300 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col items-center justify-center text-center group cursor-pointer"
+            className="lg:col-span-1 min-h-[170px] bg-gradient-to-br from-indigo-50/80 to-purple-50/80 dark:from-gray-800 dark:to-gray-800/80 hover:from-indigo-100 hover:to-purple-100 dark:hover:from-gray-750 dark:hover:to-gray-750 border-2 border-dashed border-indigo-300 dark:border-indigo-700 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col items-center justify-center text-center group cursor-pointer"
           >
             <div className="w-12 h-12 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-md group-hover:scale-110 transition-transform mb-2">
               <Plus className="w-6 h-6" />
             </div>
-            <span className="text-sm font-bold text-indigo-950">Add Expense Card</span>
-            <span className="text-[11px] text-indigo-600/80 font-medium mt-0.5">
+            <span className="text-sm font-bold text-indigo-950 dark:text-indigo-200">Add Expense Card</span>
+            <span className="text-[11px] text-indigo-600/80 dark:text-indigo-400/80 font-medium mt-0.5">
               Click to add new
             </span>
           </button>
@@ -1338,33 +1339,33 @@ export default function Expenditure({
         {/* Overview Box Grid Section: Saved Expense Cards (4 in a row) */}
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wide flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-indigo-600" />
+            <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase tracking-wide flex items-center gap-2">
+              <Receipt className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               <span>Expense Cards ({sortedFilteredExpenses.length})</span>
             </h3>
 
             {/* Sorting Dropdown Control Bar */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-2xs">
-                <span className="text-xs font-bold text-gray-600 flex items-center gap-1">
-                  <Filter className="w-3.5 h-3.5 text-indigo-600" />
+              <div className="flex items-center gap-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-1.5 shadow-2xs">
+                <span className="text-xs font-bold text-gray-600 dark:text-gray-300 flex items-center gap-1">
+                  <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                   <span>Sort Cards:</span>
                 </span>
                 <select
                   value={cardSortOption}
                   onChange={(e) => setCardSortOption(e.target.value as CardSortOption)}
-                  className="text-xs font-bold text-indigo-900 bg-transparent focus:outline-none cursor-pointer"
+                  className="text-xs font-bold text-indigo-900 dark:text-indigo-300 bg-transparent focus:outline-none cursor-pointer"
                 >
-                  <option value="custom">Default / Custom Drag Order</option>
-                  <option value="a-z">A to Z (Name)</option>
-                  <option value="z-a">Z to A (Name)</option>
-                  <option value="amount-desc">High Money Spent → Low Money Spent</option>
-                  <option value="amount-asc">Low Money Spent → High Money Spent</option>
+                  <option value="custom" className="dark:bg-gray-900 dark:text-white">Default / Custom Drag Order</option>
+                  <option value="a-z" className="dark:bg-gray-900 dark:text-white">A to Z (Name)</option>
+                  <option value="z-a" className="dark:bg-gray-900 dark:text-white">Z to A (Name)</option>
+                  <option value="amount-desc" className="dark:bg-gray-900 dark:text-white">High Money Spent → Low Money Spent</option>
+                  <option value="amount-asc" className="dark:bg-gray-900 dark:text-white">Low Money Spent → High Money Spent</option>
                 </select>
               </div>
 
               {selectedCategories.length > 0 && (
-                <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-xl font-semibold border border-indigo-100">
+                <span className="text-xs bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 px-2.5 py-1.5 rounded-xl font-semibold border border-indigo-100 dark:border-indigo-900">
                   Filtered: {selectedCategories.join(', ')}
                 </span>
               )}
@@ -1417,7 +1418,7 @@ export default function Expenditure({
                         setConfirmItemDeleteInModal(null);
                       }
                     }}
-                    className={`min-h-[176px] bg-white border border-gray-200 rounded-2xl p-4 shadow-sm hover:shadow-lg hover:border-indigo-400 transition-all flex flex-col items-center justify-between text-center relative group ${
+                    className={`min-h-[176px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm hover:shadow-lg hover:border-indigo-400 dark:hover:border-indigo-500 transition-all flex flex-col items-center justify-between text-center relative group ${
                       isDragging ? 'opacity-40 border-dashed border-indigo-400' : ''
                     } ${isEditingThisCard ? 'ring-2 ring-indigo-500 border-indigo-500 z-20' : 'cursor-pointer'}`}
                   >
@@ -1426,7 +1427,7 @@ export default function Expenditure({
                       <div
                         onMouseDown={() => setCanDragExpenseId(expense.id)}
                         onMouseUp={() => setCanDragExpenseId(null)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity cursor-grab text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity cursor-grab text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
                         title="Drag to reorder"
                       >
                         <GripVertical className="w-4 h-4" />
@@ -1438,7 +1439,7 @@ export default function Expenditure({
                             e.stopPropagation();
                             handleStartEditExpense(expense);
                           }}
-                          className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                          className="p-1 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-gray-700 rounded-lg transition-all"
                           title="Edit title & icon"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
@@ -1448,7 +1449,7 @@ export default function Expenditure({
                             e.stopPropagation();
                             promptOutsideDeleteExpense(expense);
                           }}
-                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-all"
                           title="Delete card"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1467,7 +1468,7 @@ export default function Expenditure({
                           <button
                             type="button"
                             onClick={() => setShowEditIconPicker((v) => !v)}
-                            className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-xl hover:bg-indigo-100 transition-colors shadow-xs"
+                            className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-xl hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors shadow-xs"
                             title="Change icon"
                           >
                             {editingExpense.icon || '🍔'}
@@ -1475,18 +1476,18 @@ export default function Expenditure({
 
                           {/* Emoji Picker Popover */}
                           {showEditIconPicker && (
-                            <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 w-64 bg-white border border-gray-200 rounded-xl shadow-2xl p-3 space-y-2 text-left">
-                              <div className="flex items-center justify-between text-xs font-bold text-gray-700 border-b border-gray-100 pb-1.5">
+                            <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-3 space-y-2 text-left">
+                              <div className="flex items-center justify-between text-xs font-bold text-gray-700 dark:text-gray-200 border-b border-gray-100 dark:border-gray-700 pb-1.5">
                                 <span>Choose Icon</span>
                                 <button
                                   type="button"
                                   onClick={() => setShowEditIconPicker(false)}
-                                  className="text-gray-400 hover:text-gray-600 p-0.5"
+                                  className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 p-0.5"
                                 >
                                   <X className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                              <div className="flex items-center gap-1 border-b border-gray-100 pb-1.5 overflow-x-auto">
+                              <div className="flex items-center gap-1 border-b border-gray-100 dark:border-gray-700 pb-1.5 overflow-x-auto">
                                 {EMOJI_CATEGORIES.map((cat, idx) => (
                                   <button
                                     key={cat.name}
@@ -1495,7 +1496,7 @@ export default function Expenditure({
                                     className={`px-2 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap transition-colors ${
                                       editEmojiTab === idx
                                         ? 'bg-indigo-600 text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                                     }`}
                                   >
                                     {cat.icon}
@@ -1514,7 +1515,7 @@ export default function Expenditure({
                                     className={`h-8 text-base rounded-lg flex items-center justify-center transition-transform hover:scale-110 ${
                                       editingExpense.icon === emoji
                                         ? 'bg-indigo-600 text-white shadow-xs'
-                                        : 'hover:bg-indigo-50'
+                                        : 'hover:bg-indigo-50 dark:hover:bg-indigo-950/60'
                                     }`}
                                   >
                                     {emoji}
@@ -1534,7 +1535,7 @@ export default function Expenditure({
                           }
                           onKeyDown={(e) => e.key === 'Enter' && handleSaveEditExpense()}
                           autoFocus
-                          className="w-full px-2 py-1 text-xs border border-indigo-300 rounded-lg text-center font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                          className="w-full px-2 py-1 text-xs border border-indigo-300 dark:border-indigo-600 rounded-lg text-center font-bold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-gray-900"
                         />
 
                         {/* Save & Cancel buttons */}
@@ -1550,7 +1551,7 @@ export default function Expenditure({
                           <button
                             type="button"
                             onClick={() => setEditingExpense(null)}
-                            className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-[11px] font-semibold"
+                            className="px-2.5 py-1 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-[11px] font-semibold"
                           >
                             Cancel
                           </button>
@@ -1559,24 +1560,24 @@ export default function Expenditure({
                     ) : (
                       <>
                         {/* Icon */}
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-2xl shadow-xs group-hover:scale-105 transition-transform my-1">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900 flex items-center justify-center text-2xl shadow-xs group-hover:scale-105 transition-transform my-1">
                           {expense.icon || '🍔'}
                         </div>
 
                         {/* Title & Amount alone */}
                         <div className="w-full px-1">
                           <h4
-                            className="font-bold text-gray-900 text-sm truncate"
+                            className="font-bold text-gray-900 dark:text-gray-100 text-sm truncate"
                             title={expense.description}
                           >
                             {expense.description}
                           </h4>
-                          <span className="text-base font-extrabold text-indigo-600 block mt-0.5">
+                          <span className="text-base font-extrabold text-indigo-600 dark:text-indigo-400 block mt-0.5">
                             ${totalSpent.toFixed(2)}
                           </span>
                         </div>
 
-                        <span className="text-[10px] text-indigo-500 font-semibold group-hover:underline opacity-80 mb-1">
+                        <span className="text-[10px] text-indigo-500 dark:text-indigo-400 font-semibold group-hover:underline opacity-80 mb-1">
                           Click for details →
                         </span>
                       </>
@@ -1602,12 +1603,12 @@ export default function Expenditure({
       {/* Detail View Modal (Opens on card click; prompts deletions IN THE DETAILED VIEW ITSELF!) */}
       {activeDetailExpense && (
         <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             {/* Screenshot Header Bar: Chevron ∨ | Icon + Title + (X entries) | + Add Entry | + Add Column | Trash Icon | Close X */}
-            <div className="p-4 bg-white border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+            <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
               {/* Left Side: Chevron + Icon + Title + (X entries) + Edit Button */}
               <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
 
                 {editingExpense?.id === activeDetailExpense.id ? (
                   <div className="flex items-center gap-2 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
@@ -1615,7 +1616,7 @@ export default function Expenditure({
                       <button
                         type="button"
                         onClick={() => setShowEditIconPicker((v) => !v)}
-                        className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-base hover:bg-indigo-100 transition-colors shadow-2xs"
+                        className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-base hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors shadow-2xs"
                         title="Change icon"
                       >
                         {editingExpense.icon || '🍔'}
@@ -1623,18 +1624,18 @@ export default function Expenditure({
 
                       {/* Emoji Picker Popover in Modal Header */}
                       {showEditIconPicker && (
-                        <div className="absolute top-10 left-0 z-50 w-64 bg-white border border-gray-200 rounded-xl shadow-2xl p-3 space-y-2 text-left">
-                          <div className="flex items-center justify-between text-xs font-bold text-gray-700 border-b border-gray-100 pb-1.5">
+                        <div className="absolute top-10 left-0 z-50 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-3 space-y-2 text-left">
+                          <div className="flex items-center justify-between text-xs font-bold text-gray-700 dark:text-gray-200 border-b border-gray-100 dark:border-gray-700 pb-1.5">
                             <span>Choose Icon</span>
                             <button
                               type="button"
                               onClick={() => setShowEditIconPicker(false)}
-                              className="text-gray-400 hover:text-gray-600 p-0.5"
+                              className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 p-0.5"
                             >
                               <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                          <div className="flex items-center gap-1 border-b border-gray-100 pb-1.5 overflow-x-auto">
+                          <div className="flex items-center gap-1 border-b border-gray-100 dark:border-gray-700 pb-1.5 overflow-x-auto">
                             {EMOJI_CATEGORIES.map((cat, idx) => (
                               <button
                                 key={cat.name}
@@ -1643,7 +1644,7 @@ export default function Expenditure({
                                 className={`px-2 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap transition-colors ${
                                   editEmojiTab === idx
                                     ? 'bg-indigo-600 text-white'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                                 }`}
                               >
                                 {cat.icon}
@@ -1662,7 +1663,7 @@ export default function Expenditure({
                                 className={`h-8 text-base rounded-lg flex items-center justify-center transition-transform hover:scale-110 ${
                                   editingExpense.icon === emoji
                                     ? 'bg-indigo-600 text-white shadow-xs'
-                                    : 'hover:bg-indigo-50'
+                                    : 'hover:bg-indigo-50 dark:hover:bg-indigo-950/60'
                                 }`}
                               >
                                 {emoji}
@@ -1681,7 +1682,7 @@ export default function Expenditure({
                       }
                       onKeyDown={(e) => e.key === 'Enter' && handleSaveEditExpense()}
                       autoFocus
-                      className="flex-1 min-w-0 px-2.5 py-1 text-sm border border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-gray-900 bg-white"
+                      className="flex-1 min-w-0 px-2.5 py-1 text-sm border border-indigo-300 dark:border-indigo-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-gray-900 dark:text-white bg-white dark:bg-gray-900"
                     />
 
                     <button
@@ -1695,7 +1696,7 @@ export default function Expenditure({
                     <button
                       type="button"
                       onClick={() => setEditingExpense(null)}
-                      className="p-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors flex-shrink-0"
+                      className="p-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors flex-shrink-0"
                       title="Cancel"
                     >
                       <X className="w-4 h-4" />
@@ -1703,21 +1704,21 @@ export default function Expenditure({
                   </div>
                 ) : (
                   <>
-                    <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-base shadow-2xs flex-shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900 flex items-center justify-center text-base shadow-2xs flex-shrink-0">
                       {activeDetailExpense.icon || '🍔'}
                     </div>
-                    <h3 className="text-base font-bold text-gray-900 truncate">
+                    <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 truncate">
                       {activeDetailExpense.description}
                     </h3>
                     <button
                       type="button"
                       onClick={() => handleStartEditExpense(activeDetailExpense)}
-                      className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex-shrink-0"
+                      className="p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
                       title="Edit title & icon"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <span className="text-xs text-gray-400 font-medium flex-shrink-0">
+                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium flex-shrink-0">
                       ({(showAllModalHistory ? activeDetailExpense.items || [] : getExpenseFilteredItems(activeDetailExpense)).length} entries)
                     </span>
                     <button
@@ -1726,7 +1727,7 @@ export default function Expenditure({
                       className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border transition-all ${
                         showAllModalHistory
                           ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                          : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+                          : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
                       }`}
                       title="Toggle between current period entries and complete card history"
                     >
@@ -1750,7 +1751,7 @@ export default function Expenditure({
                 <button
                   type="button"
                   onClick={() => setShowAddColumnModal((v) => !v)}
-                  className="flex items-center gap-1 px-3.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-lg transition-colors"
+                  className="flex items-center gap-1 px-3.5 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-bold text-xs rounded-lg transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Column</span>
@@ -1762,7 +1763,7 @@ export default function Expenditure({
                   className={`p-1.5 rounded-lg transition-colors ${
                     confirmCardDeleteInModal
                       ? 'bg-red-600 text-white'
-                      : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                      : 'text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40'
                   }`}
                   title="Delete card"
                 >
@@ -1777,7 +1778,7 @@ export default function Expenditure({
                     setShowAddEntryModal(false);
                     setConfirmCardDeleteInModal(false);
                   }}
-                  className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                  className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1818,7 +1819,7 @@ export default function Expenditure({
 
             {/* Add Custom Column Drawer */}
             {showAddColumnModal && (
-              <div className="p-3 bg-indigo-50/80 border-b border-indigo-100 flex items-center gap-2 animate-in slide-in-from-top-1 duration-150">
+              <div className="p-3 bg-indigo-50/80 dark:bg-gray-900 border-b border-indigo-100 dark:border-gray-700 flex items-center gap-2 animate-in slide-in-from-top-1 duration-150">
                 <input
                   type="text"
                   placeholder="Column header name (e.g. Time, Reading, Location)..."
@@ -1828,7 +1829,7 @@ export default function Expenditure({
                     e.key === 'Enter' && handleAddCustomColumn(activeDetailExpense.id)
                   }
                   autoFocus
-                  className="flex-1 px-3 py-1.5 text-xs border border-indigo-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="flex-1 px-3 py-1.5 text-xs border border-indigo-300 dark:border-indigo-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <button
                   type="button"
@@ -1841,7 +1842,7 @@ export default function Expenditure({
                 <button
                   type="button"
                   onClick={() => setShowAddColumnModal(false)}
-                  className="p-1.5 text-gray-400 hover:text-gray-600"
+                  className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1850,8 +1851,8 @@ export default function Expenditure({
 
             {/* Add New Entry Drawer */}
             {showAddEntryModal && (
-              <div className="p-3 bg-indigo-50/80 border-b border-indigo-100 space-y-2 animate-in slide-in-from-top-1 duration-150">
-                <span className="text-xs font-bold text-indigo-900 uppercase tracking-wider block">
+              <div className="p-3 bg-indigo-50/80 dark:bg-gray-900 border-b border-indigo-100 dark:border-gray-700 space-y-2 animate-in slide-in-from-top-1 duration-150">
+                <span className="text-xs font-bold text-indigo-900 dark:text-indigo-300 uppercase tracking-wider block">
                   + Add New Entry
                 </span>
                 <div className="flex flex-wrap gap-2">
@@ -1874,7 +1875,7 @@ export default function Expenditure({
                         },
                       }))
                     }
-                    className="w-36 px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    className="w-36 px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   />
                   <input
                     type="text"
@@ -1897,7 +1898,7 @@ export default function Expenditure({
                     onKeyDown={(e) =>
                       e.key === 'Enter' && handleAddLineItem(activeDetailExpense.id)
                     }
-                    className="flex-1 min-w-[140px] px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    className="flex-1 min-w-[140px] px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   />
 
                   {/* Custom Column Inputs in Form */}
@@ -1924,7 +1925,7 @@ export default function Expenditure({
                           },
                         }))
                       }
-                      className="w-28 px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                      className="w-28 px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                     />
                   ))}
 
@@ -1950,7 +1951,7 @@ export default function Expenditure({
                     onKeyDown={(e) =>
                       e.key === 'Enter' && handleAddLineItem(activeDetailExpense.id)
                     }
-                    className="w-28 px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 text-right"
+                    className="w-28 px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 text-right"
                   />
                   <button
                     type="button"
@@ -1962,7 +1963,7 @@ export default function Expenditure({
                   <button
                     type="button"
                     onClick={() => setShowAddEntryModal(false)}
-                    className="p-1.5 text-gray-400 hover:text-gray-600"
+                    className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1975,7 +1976,7 @@ export default function Expenditure({
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
-                    <tr className="border-b border-gray-100 text-gray-400 font-semibold">
+                    <tr className="border-b border-gray-100 dark:border-gray-700 text-gray-400 dark:text-gray-400 font-semibold">
                       <th className="py-2.5 px-3">Date</th>
                       <th className="py-2.5 px-3">Detail</th>
 
@@ -1987,8 +1988,8 @@ export default function Expenditure({
                         return (
                           <th key={col} className="py-2.5 px-3">
                             {isDeletingCol ? (
-                              <div className="flex items-center gap-1 bg-red-50 p-1 rounded">
-                                <span className="text-red-700 font-bold text-[11px]">Delete {col}?</span>
+                              <div className="flex items-center gap-1 bg-red-50 dark:bg-red-950/60 p-1 rounded">
+                                <span className="text-red-700 dark:text-red-300 font-bold text-[11px]">Delete {col}?</span>
                                 <button
                                   onClick={() =>
                                     executeRemoveCustomColumn(activeDetailExpense.id, col)
@@ -1999,7 +2000,7 @@ export default function Expenditure({
                                 </button>
                                 <button
                                   onClick={() => setConfirmColumnDeleteInModal(null)}
-                                  className="px-1.5 py-0.5 bg-gray-200 text-gray-700 rounded text-[10px]"
+                                  className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded text-[10px]"
                                 >
                                   No
                                 </button>
@@ -2020,17 +2021,17 @@ export default function Expenditure({
                                     handleSaveEditColumn(activeDetailExpense.id)
                                   }
                                   autoFocus
-                                  className="w-24 px-1.5 py-0.5 border border-indigo-300 rounded text-xs bg-white focus:outline-none normal-case"
+                                  className="w-24 px-1.5 py-0.5 border border-indigo-300 dark:border-indigo-600 rounded text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none normal-case"
                                 />
                                 <button
                                   onClick={() => handleSaveEditColumn(activeDetailExpense.id)}
-                                  className="p-0.5 text-green-600 hover:bg-green-100 rounded"
+                                  className="p-0.5 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/40 rounded"
                                 >
                                   <Check className="w-3 h-3" />
                                 </button>
                                 <button
                                   onClick={() => setEditingColumn(null)}
-                                  className="p-0.5 text-gray-400 hover:bg-gray-100 rounded"
+                                  className="p-0.5 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                                 >
                                   <X className="w-3 h-3" />
                                 </button>
@@ -2041,14 +2042,14 @@ export default function Expenditure({
                                 <div className="flex items-center gap-0.5 opacity-0 group-hover/col:opacity-100 transition-opacity">
                                   <button
                                     onClick={() => setEditingColumn({ original: col, text: col })}
-                                    className="p-0.5 text-gray-400 hover:text-indigo-600 rounded"
+                                    className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded"
                                     title="Rename column"
                                   >
                                     <Edit2 className="w-3 h-3" />
                                   </button>
                                   <button
                                     onClick={() => setConfirmColumnDeleteInModal(col)}
-                                    className="p-0.5 text-gray-400 hover:text-red-600 rounded"
+                                    className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 rounded"
                                     title="Remove column"
                                   >
                                     <Trash2 className="w-3 h-3" />
@@ -2064,7 +2065,7 @@ export default function Expenditure({
                       <th className="py-2.5 px-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50 text-gray-700 font-medium">
+                  <tbody className="divide-y divide-gray-50 dark:divide-gray-700/60 text-gray-700 dark:text-gray-200 font-medium">
                     {(() => {
                       const modalItems = showAllModalHistory
                         ? activeDetailExpense.items || []
@@ -2075,7 +2076,7 @@ export default function Expenditure({
                           <tr>
                             <td
                               colSpan={4 + (activeDetailExpense.customColumns || []).length}
-                              className="py-8 text-center text-gray-400 italic"
+                              className="py-8 text-center text-gray-400 dark:text-gray-500 italic"
                             >
                               No entries found {showAllModalHistory ? 'in history' : 'for this period'}. Click "+ Add Entry" above to create an entry!
                             </td>
@@ -2091,13 +2092,13 @@ export default function Expenditure({
 
                         if (isItemDeleting) {
                           return (
-                            <tr key={item.id} className="bg-red-50/80">
+                            <tr key={item.id} className="bg-red-50/80 dark:bg-red-950/60">
                               <td
                                 colSpan={4 + (activeDetailExpense.customColumns || []).length}
                                 className="py-2.5 px-4"
                               >
                                 <div className="flex items-center justify-between">
-                                  <span className="text-red-800 font-bold text-xs">
+                                  <span className="text-red-800 dark:text-red-200 font-bold text-xs">
                                     Delete entry "{item.item || 'this entry'}"?
                                   </span>
                                   <div className="flex items-center gap-2">
@@ -2111,7 +2112,7 @@ export default function Expenditure({
                                     </button>
                                     <button
                                       onClick={() => setConfirmItemDeleteInModal(null)}
-                                      className="px-3 py-1 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs font-semibold hover:bg-gray-100"
+                                      className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
                                     >
                                       Cancel
                                     </button>
@@ -2124,7 +2125,7 @@ export default function Expenditure({
 
                         if (isItemEditing) {
                           return (
-                            <tr key={item.id} className="bg-indigo-50/50">
+                            <tr key={item.id} className="bg-indigo-50/50 dark:bg-indigo-950/50">
                               <td className="py-2 px-3">
                                 <input
                                   type="date"
@@ -2135,7 +2136,7 @@ export default function Expenditure({
                                       date: e.target.value,
                                     })
                                   }
-                                  className="px-2 py-1 border border-indigo-300 rounded-lg text-xs bg-white focus:outline-none"
+                                  className="px-2 py-1 border border-indigo-300 dark:border-indigo-600 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none"
                                 />
                               </td>
                               <td className="py-2 px-3">
@@ -2148,7 +2149,7 @@ export default function Expenditure({
                                       item: e.target.value,
                                     })
                                   }
-                                  className="w-full px-2 py-1 border border-indigo-300 rounded-lg text-xs bg-white focus:outline-none"
+                                  className="w-full px-2 py-1 border border-indigo-300 dark:border-indigo-600 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none"
                                 />
                               </td>
 
@@ -2168,7 +2169,7 @@ export default function Expenditure({
                                         },
                                       })
                                     }
-                                    className="w-full px-2 py-1 border border-indigo-300 rounded-lg text-xs bg-white focus:outline-none"
+                                    className="w-full px-2 py-1 border border-indigo-300 dark:border-indigo-600 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none"
                                   />
                                 </td>
                               ))}
@@ -2184,21 +2185,21 @@ export default function Expenditure({
                                       amount: e.target.value,
                                     })
                                   }
-                                  className="w-24 px-2 py-1 border border-indigo-300 rounded-lg text-xs bg-white text-right focus:outline-none"
+                                  className="w-24 px-2 py-1 border border-indigo-300 dark:border-indigo-600 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-right focus:outline-none"
                                 />
                               </td>
                               <td className="py-2 px-3 text-right">
                                 <div className="flex items-center justify-end gap-1">
                                   <button
                                     onClick={handleSaveEditItem}
-                                    className="p-1 text-green-600 hover:bg-green-100 rounded-lg"
+                                    className="p-1 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/40 rounded-lg"
                                     title="Save detail"
                                   >
                                     <Check className="w-4 h-4" />
                                   </button>
                                   <button
                                     onClick={() => setEditingItem(null)}
-                                    className="p-1 text-gray-400 hover:bg-gray-200 rounded-lg"
+                                    className="p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
                                     title="Cancel"
                                   >
                                     <X className="w-4 h-4" />
@@ -2210,22 +2211,22 @@ export default function Expenditure({
                         }
 
                         return (
-                          <tr key={item.id} className="hover:bg-gray-50/80 transition-colors">
-                            <td className="py-3 px-3 text-gray-600 font-normal">
+                          <tr key={item.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-700/50 transition-colors">
+                            <td className="py-3 px-3 text-gray-600 dark:text-gray-400 font-normal">
                               {item.date ? format(parseISO(item.date), 'dd MMM yyyy') : '-'}
                             </td>
-                            <td className="py-3 px-3 font-semibold text-gray-800">
+                            <td className="py-3 px-3 font-semibold text-gray-800 dark:text-gray-200">
                               {item.item}
                             </td>
 
                             {/* Dynamic Custom Column Values */}
                             {(activeDetailExpense.customColumns || []).map((col) => (
-                              <td key={col} className="py-3 px-3 text-gray-700">
+                              <td key={col} className="py-3 px-3 text-gray-700 dark:text-gray-300">
                                 {item.customValues?.[col] || '-'}
                               </td>
                             ))}
 
-                            <td className="py-3 px-3 text-right font-bold text-gray-900">
+                            <td className="py-3 px-3 text-right font-bold text-gray-900 dark:text-gray-100">
                               ${item.amount.toFixed(2)}
                             </td>
                             <td className="py-3 px-3 text-right">
@@ -2241,14 +2242,14 @@ export default function Expenditure({
                                       customValues: item.customValues || {},
                                     })
                                   }
-                                  className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
+                                  className="p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-gray-700 rounded-md"
                                   title="Edit entry"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   onClick={() => setConfirmItemDeleteInModal(item.id)}
-                                  className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+                                  className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md"
                                   title="Delete entry"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />

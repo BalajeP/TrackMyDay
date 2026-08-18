@@ -70,29 +70,29 @@ export default function AuthPage({ onLogin, onSignup, onResetPassword, error, cl
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 flex items-center justify-center p-4 transition-colors">
       <div className="w-full max-w-md">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-600 shadow-lg mb-4">
             <Users className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Track My Day</h1>
-          <p className="text-sm text-gray-500 mt-1">Your shared life, organized together</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Track My Day</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Your shared life, organized together</p>
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border border-gray-100 dark:border-gray-700">
           {/* Tab switcher */}
           {mode !== 'forgot_password' ? (
-            <div className="flex border-b border-gray-100">
+            <div className="flex border-b border-gray-100 dark:border-gray-700">
               <button
                 type="button"
                 onClick={() => switchMode('login')}
                 className={`flex-1 py-4 text-sm font-semibold transition-colors ${
                   mode === 'login'
-                    ? 'text-indigo-600 border-b-2 border-indigo-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
               >
                 Sign In
@@ -102,50 +102,50 @@ export default function AuthPage({ onLogin, onSignup, onResetPassword, error, cl
                 onClick={() => switchMode('signup')}
                 className={`flex-1 py-4 text-sm font-semibold transition-colors ${
                   mode === 'signup'
-                    ? 'text-indigo-600 border-b-2 border-indigo-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
               >
                 Create Account
               </button>
             </div>
           ) : (
-            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">
-              <h2 className="text-sm font-bold text-gray-900">Reset Your Password</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Enter your email and a new password below</p>
+            <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+              <h2 className="text-sm font-bold text-gray-900 dark:text-gray-100">Reset Your Password</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Enter your email and a new password below</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             {/* Error alert */}
             {displayError && (
-              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-700">{displayError}</p>
+              <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded-lg">
+                <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-700 dark:text-red-300">{displayError}</p>
               </div>
             )}
 
             {/* Success alert */}
             {successMessage && (
-              <div className="flex items-start gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <Check className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-green-700">{successMessage}</p>
+              <div className="flex items-start gap-2 p-3 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 rounded-lg">
+                <Check className="w-4 h-4 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-green-700 dark:text-green-300">{successMessage}</p>
               </div>
             )}
 
             {/* Name (signup only) */}
             {mode === 'signup' && (
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Your name</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5">Your name</label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Alex"
                     required
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -153,16 +153,16 @@ export default function AuthPage({ onLogin, onSignup, onResetPassword, error, cl
 
             {/* Email */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Email address</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5">Email address</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   required
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
                 />
               </div>
             </div>
@@ -170,21 +170,21 @@ export default function AuthPage({ onLogin, onSignup, onResetPassword, error, cl
             {/* Password */}
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="block text-xs font-medium text-gray-600">
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300">
                   {mode === 'forgot_password' ? 'New Password' : 'Password'}
                 </label>
                 {mode === 'login' && (
                   <button
                     type="button"
                     onClick={() => switchMode('forgot_password')}
-                    className="text-xs text-indigo-600 font-medium hover:underline cursor-pointer"
+                    className="text-xs text-indigo-600 dark:text-indigo-400 font-medium hover:underline cursor-pointer"
                   >
                     Forgot Password?
                   </button>
                 )}
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -192,12 +192,12 @@ export default function AuthPage({ onLogin, onSignup, onResetPassword, error, cl
                   placeholder={mode === 'forgot_password' ? 'Enter new password' : '••••••••'}
                   required
                   minLength={6}
-                  className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+                  className="w-full pl-10 pr-10 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -207,16 +207,16 @@ export default function AuthPage({ onLogin, onSignup, onResetPassword, error, cl
             {/* Confirm password (signup or forgot_password) */}
             {(mode === 'signup' || mode === 'forgot_password') && (
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Confirm password</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5">Confirm password</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••"
                     required
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -234,24 +234,24 @@ export default function AuthPage({ onLogin, onSignup, onResetPassword, error, cl
 
             {/* Note */}
             {mode !== 'forgot_password' ? (
-              <p className="text-xs text-center text-gray-400">
+              <p className="text-xs text-center text-gray-400 dark:text-gray-400">
                 {mode === 'login'
                   ? "Don't have an account? "
                   : 'Already have an account? '}
                 <button
                   type="button"
                   onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')}
-                  className="text-indigo-600 font-medium hover:underline cursor-pointer"
+                  className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline cursor-pointer"
                 >
                   {mode === 'login' ? 'Create one' : 'Sign in'}
                 </button>
               </p>
             ) : (
-              <p className="text-xs text-center text-gray-400">
+              <p className="text-xs text-center text-gray-400 dark:text-gray-400">
                 <button
                   type="button"
                   onClick={() => switchMode('login')}
-                  className="text-indigo-600 font-medium hover:underline cursor-pointer"
+                  className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline cursor-pointer"
                 >
                   Back to Sign In
                 </button>
@@ -260,20 +260,20 @@ export default function AuthPage({ onLogin, onSignup, onResetPassword, error, cl
           </form>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-6">
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-6">
           Your data is private and only accessible to you.
         </p>
 
         {/* Install app banner */}
         {isInstallable && (
-          <div className="mt-6 bg-white rounded-xl shadow-lg p-4 border border-indigo-100">
+          <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 border border-indigo-100 dark:border-gray-700">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                <Smartphone className="w-5 h-5 text-indigo-600" />
+              <div className="w-10 h-10 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 flex items-center justify-center flex-shrink-0">
+                <Smartphone className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-gray-900">Install Track My Day</h3>
-                <p className="text-xs text-gray-500 mt-0.5">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Install Track My Day</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                   Add to your home screen for quick access - works like an app!
                 </p>
                 <button

@@ -358,8 +358,8 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
           onClick={() => setTimeFrame('daily')}
           className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
             timeFrame === 'daily'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              ? 'bg-indigo-600 text-white dark:bg-indigo-500'
+              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
           }`}
         >
           Daily
@@ -368,8 +368,8 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
           onClick={() => setTimeFrame('weekly')}
           className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
             timeFrame === 'weekly'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              ? 'bg-indigo-600 text-white dark:bg-indigo-500'
+              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
           }`}
         >
           Weekly
@@ -378,8 +378,8 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
           onClick={() => setTimeFrame('monthly')}
           className={`px-4 py-2 rounded-lg transition-colors text-sm font-medium ${
             timeFrame === 'monthly'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              ? 'bg-indigo-600 text-white dark:bg-indigo-500'
+              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
           }`}
         >
           Monthly
@@ -388,63 +388,63 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Timer className="w-5 h-5 text-indigo-600" />
-            <p className="text-sm text-gray-600">Total Time</p>
+            <Timer className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <p className="text-sm text-gray-600 dark:text-gray-300">Total Time</p>
           </div>
-          <p className="text-3xl font-bold text-indigo-600">{stats.totalMinutes}</p>
-          <p className="text-xs text-gray-500 mt-1">minutes</p>
+          <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{stats.totalMinutes}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">minutes</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Dumbbell className="w-5 h-5 text-blue-600" />
-            <p className="text-sm text-gray-600">Workouts</p>
+            <Dumbbell className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <p className="text-sm text-gray-600 dark:text-gray-300">Workouts</p>
           </div>
-          <p className="text-3xl font-bold text-blue-600">{stats.totalWorkouts}</p>
-          <p className="text-xs text-gray-500 mt-1">sessions</p>
+          <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.totalWorkouts}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">sessions</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-5 h-5 text-green-600" />
-            <p className="text-sm text-gray-600">Latest Weight</p>
+            <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <p className="text-sm text-gray-600 dark:text-gray-300">Latest Weight</p>
           </div>
-          <p className="text-3xl font-bold text-green-600">{stats.latestWeight}</p>
-          <p className="text-xs text-gray-500 mt-1">kg</p>
+          <p className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.latestWeight}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">kg</p>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <div className="flex items-center gap-2 mb-2">
-            <Calendar className="w-5 h-5 text-orange-600" />
-            <p className="text-sm text-gray-600">Avg Weight</p>
+            <Calendar className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+            <p className="text-sm text-gray-600 dark:text-gray-300">Avg Weight</p>
           </div>
-          <p className="text-3xl font-bold text-orange-600">{stats.avgWeight}</p>
-          <p className="text-xs text-gray-500 mt-1">kg ({stats.weightRecords} records)</p>
+          <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.avgWeight}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">kg ({stats.weightRecords} records)</p>
         </div>
       </div>
 
       {/* Weight Tracking Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="px-5 py-4 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="px-5 py-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-gray-900 dark:to-gray-850 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-green-600" />
-            <h2 className="text-lg font-semibold text-gray-900">Weight Tracking</h2>
-            <span className="text-xs text-gray-500 ml-2">({filteredWeightEntries.length} records)</span>
+            <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Weight Tracking</h2>
+            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">({filteredWeightEntries.length} records)</span>
           </div>
         </div>
 
         <div className="p-5">
           {/* Quick Add Weight */}
-          <div className="mb-5 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-sm font-medium text-gray-700 mb-3">Add Today's Weight</p>
+          <div className="mb-5 p-4 bg-gray-50 dark:bg-gray-900/60 rounded-lg border border-gray-200 dark:border-gray-700">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Add Today's Weight</p>
             <div className="flex gap-3">
               <input
                 type="date"
                 value={newWeightDate}
                 onChange={(e) => setNewWeightDate(e.target.value)}
-                className="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+                className="px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
               />
               <input
                 type="number"
@@ -453,12 +453,12 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
                 onChange={(e) => setNewWeight(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addWeightEntry()}
                 placeholder="Weight (kg)"
-                className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
+                className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-green-400 text-sm"
               />
               <button
                 onClick={addWeightEntry}
                 disabled={!newWeight.trim()}
-                className="px-5 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 transition-colors flex items-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus className="w-4 h-4" />
                 Add Weight
@@ -469,29 +469,29 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
           {/* Weight History */}
           {filteredWeightEntries.length > 0 && (
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-3">Weight History</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Weight History</p>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Date</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Weight (kg)</th>
+                    <tr className="border-b border-gray-200 dark:border-gray-700">
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-600 dark:text-gray-400">Date</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-600 dark:text-gray-400">Weight (kg)</th>
                       <th className="px-3 py-2 w-12"></th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredWeightEntries.slice(0, 10).map((entry) => (
-                      <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="px-3 py-3 text-sm text-gray-700">
+                      <tr key={entry.id} className="border-b border-gray-100 dark:border-gray-700/60 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="px-3 py-3 text-sm text-gray-700 dark:text-gray-300">
                           {format(parseISO(entry.date), 'MMM d, yyyy')}
                         </td>
-                        <td className="px-3 py-3 text-sm font-medium text-gray-900">
+                        <td className="px-3 py-3 text-sm font-medium text-gray-900 dark:text-gray-100">
                           {entry.weight} kg
                         </td>
                         <td className="px-3 py-3">
                           <button
                             onClick={() => setConfirmDelete({ type: 'weight', weightId: entry.id })}
-                            className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-1.5 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -501,7 +501,7 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
                   </tbody>
                 </table>
                 {filteredWeightEntries.length > 10 && (
-                  <p className="text-xs text-gray-400 text-center mt-3">
+                  <p className="text-xs text-gray-400 dark:text-gray-500 text-center mt-3">
                     Showing latest 10 entries (total: {filteredWeightEntries.length})
                   </p>
                 )}
@@ -510,7 +510,7 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
           )}
 
           {filteredWeightEntries.length === 0 && (
-            <div className="text-center py-8 text-gray-400">
+            <div className="text-center py-8 text-gray-400 dark:text-gray-500">
               <p className="text-sm">No weight entries yet. Add your first entry above!</p>
             </div>
           )}
@@ -518,8 +518,8 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
       </div>
 
       {/* Add new workout category */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Workout Type</h2>
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Add New Workout Type</h2>
         <div className="flex gap-3">
           <input
             type="text"
@@ -527,7 +527,7 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
             onChange={(e) => setNewCategoryName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addCategory()}
             placeholder="e.g., Cycling, Swimming, Stretching..."
-            className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
+            className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
           />
           <button
             onClick={addCategory}
@@ -542,21 +542,21 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
       {/* Workout categories list */}
       <div className="space-y-4">
         {filteredCategories.map((category) => (
-          <div key={category.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div key={category.id} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             {/* Category header */}
-            <div className="flex items-center justify-between px-5 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="flex items-center justify-between px-5 py-4 bg-gray-50 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-700">
               <button
                 onClick={() => toggleExpanded(category.id)}
-                className="flex items-center gap-2 text-gray-900 font-semibold hover:text-indigo-600 transition-colors"
+                className="flex items-center gap-2 text-gray-900 dark:text-gray-100 font-semibold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
               >
                 {category.expanded ? (
-                  <ChevronDown className="w-5 h-5 text-gray-500" />
+                  <ChevronDown className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                 ) : (
-                  <ChevronRight className="w-5 h-5 text-gray-500" />
+                  <ChevronRight className="w-5 h-5 text-gray-500 dark:text-gray-400" />
                 )}
-                <Dumbbell className="w-4 h-4 text-indigo-600" />
+                <Dumbbell className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                 <span>{category.name}</span>
-                <span className="text-xs text-gray-500 font-normal ml-1">
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-normal ml-1">
                   ({category.entries.length} {category.entries.length === 1 ? 'entry' : 'entries'})
                 </span>
               </button>
@@ -573,7 +573,7 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
                     {!category.isWeight && (
                       <button
                         onClick={() => addColumn(category.id)}
-                        className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors flex items-center gap-1.5 text-xs font-medium"
+                        className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5 text-xs font-medium"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         Add Column
@@ -583,7 +583,7 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
                 )}
                 <button
                   onClick={() => setConfirmDelete({ type: 'category', categoryId: category.id, categoryName: category.name })}
-                  className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  className="p-1.5 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -594,14 +594,14 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
             {category.expanded && (
               <div className="p-5">
                 {category.entries.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400">
+                  <div className="text-center py-8 text-gray-400 dark:text-gray-500">
                     <p className="text-sm">No entries yet. Click "Add Entry" to start tracking.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-gray-200">
+                        <tr className="border-b border-gray-200 dark:border-gray-700">
                           {category.columns.map((col) => (
                             <th key={col.id} className="px-3 py-2 text-left">
                               {editingColumn?.categoryId === category.id && editingColumn?.columnId === col.id ? (
@@ -614,28 +614,28 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
                                       if (e.key === 'Enter') saveColumnName();
                                       if (e.key === 'Escape') cancelEditingColumn();
                                     }}
-                                    className="px-2 py-1 border border-indigo-400 rounded text-xs font-medium w-24 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                    className="px-2 py-1 border border-indigo-400 dark:border-indigo-500 rounded text-xs font-medium w-24 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                     autoFocus
                                   />
                                   <button
                                     onClick={saveColumnName}
-                                    className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                    className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 rounded"
                                   >
                                     <Check className="w-3 h-3" />
                                   </button>
                                   <button
                                     onClick={cancelEditingColumn}
-                                    className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                                    className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-2 group">
-                                  <span className="text-xs font-medium text-gray-600">{col.name}</span>
+                                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{col.name}</span>
                                   <button
                                     onClick={() => startEditingColumn(category.id, col.id, col.name)}
-                                    className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-indigo-600 transition-opacity"
+                                    className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-opacity"
                                   >
                                     <Edit2 className="w-3 h-3" />
                                   </button>
@@ -648,7 +648,7 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
                                         columnId: col.id,
                                         columnName: col.name
                                       })}
-                                      className="opacity-0 group-hover:opacity-100 p-0.5 text-red-400 hover:text-red-600 transition-opacity"
+                                      className="opacity-0 group-hover:opacity-100 p-0.5 text-red-400 hover:text-red-600 dark:hover:text-red-400 transition-opacity"
                                     >
                                       <Trash2 className="w-3 h-3" />
                                     </button>
@@ -662,14 +662,14 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
                       </thead>
                       <tbody>
                         {category.entries.map((entry) => (
-                          <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                          <tr key={entry.id} className="border-b border-gray-100 dark:border-gray-700/60 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                             {category.columns.map((col) => (
                               <td key={col.id} className="px-3 py-3">
                                 <input
                                   type={col.type}
                                   value={entry.data[col.id] || ''}
                                   onChange={(e) => updateEntryData(category.id, entry.id, col.id, e.target.value)}
-                                  className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                  className="w-full px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                 />
                               </td>
                             ))}
@@ -681,7 +681,7 @@ export default function WorkoutSchedule({ activePerson, accessToken, onUnsavedCh
                                   categoryName: category.name,
                                   entryId: entry.id
                                 })}
-                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                className="p-1.5 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>

@@ -162,72 +162,72 @@ export default function DailyActivities({ activePerson, partner1Name, partner2Na
       </div>
 
       {/* Overall Progress — based on today's checkboxes */}
-      <div className="bg-white rounded-lg p-6 border border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Overall Progress</h3>
-            <p className="text-sm text-gray-500 mt-0.5">Today — {format(today, 'EEEE, MMM d')}</p>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Overall Progress</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Today — {format(today, 'EEEE, MMM d')}</p>
           </div>
-          <span className="text-3xl font-bold text-indigo-600">{todayProgress}%</span>
+          <span className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{todayProgress}%</span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-3">
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
           <div
-            className="h-3 rounded-full transition-all bg-indigo-500"
+            className="h-3 rounded-full transition-all bg-indigo-500 dark:bg-indigo-400"
             style={{ width: `${todayProgress}%` }}
           />
         </div>
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
           {todayCompleted} of {todayTotal} habits completed today
         </p>
       </div>
 
       {/* Weekly Habit Grid */}
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         {/* Week navigation */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Weekly Habits</h3>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Weekly Habits</h3>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setWeekOffset((w) => w - 1)}
-              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
-              <ChevronLeft className="w-4 h-4 text-gray-600" />
+              <ChevronLeft className="w-4 h-4 text-gray-600 dark:text-gray-300" />
             </button>
             <button
               onClick={() => setWeekOffset(0)}
               className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${
                 weekOffset === 0
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-indigo-600 text-white dark:bg-indigo-500'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}
             >
               This Week
             </button>
             <button
               onClick={() => setWeekOffset((w) => w + 1)}
-              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
-              <ChevronRight className="w-4 h-4 text-gray-600" />
+              <ChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-300" />
             </button>
           </div>
         </div>
 
         {/* Week range label */}
-        <div className="px-5 py-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-500">
+        <div className="px-5 py-2 bg-gray-50 dark:bg-gray-900/60 border-b border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400">
           {format(weekDays[0], 'MMM d')} – {format(weekDays[6], 'MMM d, yyyy')}
         </div>
 
         {data.habits.length === 0 ? (
-          <div className="p-8 text-center text-gray-400">
+          <div className="p-8 text-center text-gray-400 dark:text-gray-500">
             No habits yet. Add one below to start tracking.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px] border-collapse">
               <thead>
-                <tr className="border-b border-gray-200">
+                <tr className="border-b border-gray-200 dark:border-gray-700">
                   {/* Habit name column header */}
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-40 bg-gray-50 sticky left-0 z-10">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide w-40 bg-gray-50 dark:bg-gray-900/80 sticky left-0 z-10">
                     Habit
                   </th>
                   {weekDays.map((day, i) => {
@@ -235,32 +235,32 @@ export default function DailyActivities({ activePerson, partner1Name, partner2Na
                     return (
                       <th
                         key={i}
-                        className={`px-2 py-3 text-center min-w-[56px] ${todayCol ? 'bg-indigo-50' : 'bg-gray-50'}`}
+                        className={`px-2 py-3 text-center min-w-[56px] ${todayCol ? 'bg-indigo-50 dark:bg-indigo-950/60' : 'bg-gray-50 dark:bg-gray-900/80'}`}
                       >
-                        <div className={`text-xs font-semibold uppercase tracking-wide ${todayCol ? 'text-indigo-600' : 'text-gray-500'}`}>
+                        <div className={`text-xs font-semibold uppercase tracking-wide ${todayCol ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'}`}>
                           {DAY_LABELS[i]}
                         </div>
-                        <div className={`text-sm font-bold mt-0.5 ${todayCol ? 'text-indigo-700' : 'text-gray-700'}`}>
+                        <div className={`text-sm font-bold mt-0.5 ${todayCol ? 'text-indigo-700 dark:text-indigo-300' : 'text-gray-700 dark:text-gray-300'}`}>
                           {format(day, 'd')}
                         </div>
                         {todayCol && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 mx-auto mt-1" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400 mx-auto mt-1" />
                         )}
                       </th>
                     );
                   })}
                   {/* Actions column */}
-                  <th className="w-16 bg-gray-50" />
+                  <th className="w-16 bg-gray-50 dark:bg-gray-900/80" />
                 </tr>
               </thead>
               <tbody>
                 {data.habits.map((habit, hIdx) => (
                   <tr
                     key={habit.id}
-                    className={`border-b border-gray-100 last:border-0 ${hIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}
+                    className={`border-b border-gray-100 dark:border-gray-700/60 last:border-0 ${hIdx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/40 dark:bg-gray-800/60'}`}
                   >
                     {/* Habit name */}
-                    <td className={`px-4 py-3 sticky left-0 z-10 ${hIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                    <td className={`px-4 py-3 sticky left-0 z-10 ${hIdx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/40 dark:bg-gray-800/60'}`}>
                       {editingHabitId === habit.id ? (
                         <div className="flex items-center gap-1">
                           <input
@@ -272,17 +272,17 @@ export default function DailyActivities({ activePerson, partner1Name, partner2Na
                               if (e.key === 'Enter') confirmEditHabit();
                               if (e.key === 'Escape') setEditingHabitId(null);
                             }}
-                            className="flex-1 min-w-0 text-sm px-2 py-1 border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="flex-1 min-w-0 text-sm px-2 py-1 border border-indigo-300 dark:border-gray-600 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
                           />
-                          <button onClick={confirmEditHabit} className="p-1 text-green-600 hover:bg-green-50 rounded">
+                          <button onClick={confirmEditHabit} className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 rounded">
                             <Check className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={() => setEditingHabitId(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded">
+                          <button onClick={() => setEditingHabitId(null)} className="p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
                             <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ) : (
-                        <span className="text-sm font-medium text-gray-800 truncate block max-w-[130px]" title={habit.name}>
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate block max-w-[130px]" title={habit.name}>
                           {habit.name}
                         </span>
                       )}
@@ -295,18 +295,18 @@ export default function DailyActivities({ activePerson, partner1Name, partner2Na
                       return (
                         <td
                           key={dIdx}
-                          className={`px-2 py-3 text-center ${todayCol ? 'bg-indigo-50/60' : ''}`}
+                          className={`px-2 py-3 text-center ${todayCol ? 'bg-indigo-50/60 dark:bg-indigo-950/40' : ''}`}
                         >
                           <button
                             onClick={() => toggleCheck(habit.id, day)}
                             className={`w-7 h-7 rounded-md border-2 flex items-center justify-center mx-auto transition-all ${
                               checked
                                 ? todayCol
-                                  ? 'bg-indigo-600 border-indigo-600 shadow-sm'
-                                  : 'bg-green-500 border-green-500'
+                                  ? 'bg-indigo-600 dark:bg-indigo-500 border-indigo-600 dark:border-indigo-500 shadow-sm'
+                                  : 'bg-green-500 dark:bg-green-600 border-green-500 dark:border-green-600'
                                 : todayCol
-                                ? 'border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50'
-                                : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                                ? 'border-indigo-300 dark:border-indigo-600 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/50'
+                                : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                             }`}
                           >
                             {checked && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
@@ -320,13 +320,13 @@ export default function DailyActivities({ activePerson, partner1Name, partner2Na
                       <div className="flex items-center gap-1 justify-center">
                         <button
                           onClick={() => startEditHabit(habit)}
-                          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                          className="p-1.5 text-gray-400 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-gray-700 rounded transition-colors"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setConfirmDeleteHabit({ id: habit.id, name: habit.name })}
-                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                          className="p-1.5 text-gray-400 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -341,9 +341,9 @@ export default function DailyActivities({ activePerson, partner1Name, partner2Na
 
         {/* Weekly summary row */}
         {data.habits.length > 0 && (
-          <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 overflow-x-auto">
+          <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/80 overflow-x-auto">
             <div className="flex items-center min-w-[600px]">
-              <div className="w-40 flex-shrink-0 text-xs font-semibold text-gray-500 px-0">
+              <div className="w-40 flex-shrink-0 text-xs font-semibold text-gray-500 dark:text-gray-400 px-0">
                 Daily total
               </div>
               {weekDays.map((day, i) => {
@@ -353,12 +353,12 @@ export default function DailyActivities({ activePerson, partner1Name, partner2Na
                 const todayCol = isToday(day);
                 return (
                   <div key={i} className="min-w-[56px] px-2 text-center">
-                    <div className={`text-sm font-bold ${todayCol ? 'text-indigo-600' : count === total && total > 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                    <div className={`text-sm font-bold ${todayCol ? 'text-indigo-600 dark:text-indigo-400' : count === total && total > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>
                       {count}/{total}
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 mt-1">
                       <div
-                        className={`h-1 rounded-full ${todayCol ? 'bg-indigo-500' : 'bg-green-500'}`}
+                        className={`h-1 rounded-full ${todayCol ? 'bg-indigo-500 dark:bg-indigo-400' : 'bg-green-500 dark:bg-green-400'}`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -372,8 +372,8 @@ export default function DailyActivities({ activePerson, partner1Name, partner2Na
       </div>
 
       {/* Add Habit */}
-      <div className="bg-white rounded-lg p-5 border border-gray-200">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Add New Habit Column</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-5 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Add New Habit Column</h3>
         <div className="flex gap-2">
           <input
             type="text"
@@ -381,7 +381,7 @@ export default function DailyActivities({ activePerson, partner1Name, partner2Na
             value={newHabitName}
             onChange={(e) => setNewHabitName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addHabit()}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
           />
           <button
             onClick={addHabit}
