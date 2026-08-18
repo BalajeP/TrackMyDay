@@ -1,4 +1,4 @@
-import { sendPwaNotification, getNotificationPermissionStatus } from './notifications';
+import { sendPwaNotification, scheduleExactNotificationTrigger, getNotificationPermissionStatus } from './notifications';
 import { format, parseISO } from 'date-fns';
 
 interface StoredEvent {
@@ -52,8 +52,6 @@ export function checkAndTriggerDueEventNotifications(): number {
 
   const now = new Date();
   const currentDateStr = format(now, 'yyyy-MM-dd');
-  const currentTimeStr = format(now, 'HH:mm');
-
   const firedSet = getFiredNotifications();
   let triggeredCount = 0;
 
@@ -62,32 +60,46 @@ export function checkAndTriggerDueEventNotifications(): number {
 
     // Check all dates for this event (either main date or reminder dates)
     const targetDates = Array.from(new Set([ev.date, ...(ev.notificationDates || [])]));
-    if (!targetDates.includes(currentDateStr)) return;
 
-    // Determine notification time (default to 08:00 if not set)
-    const scheduledTime = ev.notificationTime || '08:00';
+    targetDates.forEach((dateStr) => {
+      const scheduledTime = ev.notificationTime || '08:00';
+      const notifUniqueKey = `${ev.id}_${dateStr}_${scheduledTime}`;
+      const scheduledDateTime = new Date(`${dateStr}T${scheduledTime}:00`);
+      const scheduledMs = scheduledDateTime.getTime();
 
-    // If current time matches scheduled hour & minute
-    if (currentTimeStr === scheduledTime) {
-      const notifUniqueKey = `${ev.id}_${currentDateStr}_${scheduledTime}`;
+      if (isNaN(scheduledMs)) return;
 
-      if (!firedSet.has(notifUniqueKey)) {
-        const title = `${ev.icon || '📌'} ${ev.title}`;
-        const isMainDay = ev.date === currentDateStr;
-        const body = isMainDay
-          ? `🎯 Today is Event Day! (${currentDateStr} @ ${scheduledTime})\n${ev.todoText || ''}`
-          : `🔔 Reminder: Event scheduled for ${format(parseISO(ev.date), 'MMM d, yyyy')}\n${ev.todoText || ''}`;
+      const diffMs = now.getTime() - scheduledMs;
 
-        sendPwaNotification(title, {
-          body,
-          icon: '/icon.svg',
-          tag: notifUniqueKey,
-        });
-
-        saveFiredNotification(notifUniqueKey);
-        triggeredCount++;
+      // If scheduled time passed by more than 2 minutes before app was opened,
+      // DO NOT show a notification late upon app entry! Mark silently.
+      if (diffMs > 2 * 60 * 1000) {
+        if (!firedSet.has(notifUniqueKey)) {
+          saveFiredNotification(notifUniqueKey);
+        }
+        return;
       }
-    }
+
+      // If current time is within 0 to 2 minutes of scheduled time while app is open
+      if (diffMs >= 0 && diffMs <= 2 * 60 * 1000) {
+        if (!firedSet.has(notifUniqueKey)) {
+          const title = `${ev.icon || '📌'} ${ev.title}`;
+          const isMainDay = ev.date === currentDateStr;
+          const body = isMainDay
+            ? `🎯 Today is Event Day! (${currentDateStr} @ ${scheduledTime})\n${ev.todoText || ''}`
+            : `🔔 Reminder: Event scheduled for ${format(parseISO(ev.date), 'MMM d, yyyy')}\n${ev.todoText || ''}`;
+
+          sendPwaNotification(title, {
+            body,
+            icon: '/icon.svg',
+            tag: notifUniqueKey,
+          });
+
+          saveFiredNotification(notifUniqueKey);
+          triggeredCount++;
+        }
+      }
+    });
   });
 
   return triggeredCount;
@@ -119,6 +131,34 @@ export function syncEventsToServiceWorker() {
         sendMsg(registration.active);
       });
     }
+
+    // Schedule exact Notification Triggers directly with OS Alarm Manager for all future events!
+    const firedSet = getFiredNotifications();
+    const nowMs = Date.now();
+
+    events.forEach((ev) => {
+      if (ev.completed) return;
+      const targetDates = Array.from(new Set([ev.date, ...(ev.notificationDates || [])]));
+      targetDates.forEach((dateStr) => {
+        const scheduledTime = ev.notificationTime || '08:00';
+        const notifUniqueKey = `${ev.id}_${dateStr}_${scheduledTime}`;
+        const scheduledMs = new Date(`${dateStr}T${scheduledTime}:00`).getTime();
+
+        if (!isNaN(scheduledMs) && scheduledMs > nowMs && !firedSet.has(notifUniqueKey)) {
+          const title = `${ev.icon || '📌'} ${ev.title}`;
+          const body = ev.date === dateStr
+            ? `🎯 Today is Event Day! (${dateStr} @ ${scheduledTime})\n${ev.todoText || ''}`
+            : `🔔 Reminder: Event scheduled for ${dateStr}\n${ev.todoText || ''}`;
+
+          scheduleExactNotificationTrigger(title, {
+            body,
+            icon: '/icon.svg',
+            tag: notifUniqueKey,
+            scheduledTimeMs: scheduledMs,
+          });
+        }
+      });
+    });
   }
 }
 

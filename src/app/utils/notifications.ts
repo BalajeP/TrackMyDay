@@ -68,3 +68,41 @@ export async function sendPwaNotification(
     return false;
   }
 }
+
+export async function scheduleExactNotificationTrigger(
+  title: string,
+  options: {
+    body?: string;
+    icon?: string;
+    badge?: string;
+    tag?: string;
+    scheduledTimeMs: number;
+    data?: any;
+  }
+): Promise<boolean> {
+  if (options.scheduledTimeMs <= Date.now()) return false;
+  if (!('serviceWorker' in navigator)) return false;
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    if (registration && registration.showNotification) {
+      if ('showTrigger' in Notification.prototype && (window as any).TimestampTrigger) {
+        const TimestampTrigger = (window as any).TimestampTrigger;
+        await registration.showNotification(title, {
+          body: options.body || 'TrackMyDay Reminder',
+          icon: options.icon || '/icon.svg',
+          badge: options.badge || '/icon.svg',
+          tag: options.tag,
+          data: options.data || { url: '/' },
+          vibrate: [200, 100, 200],
+          showTrigger: new TimestampTrigger(options.scheduledTimeMs),
+        } as any);
+        return true;
+      }
+    }
+  } catch (err) {
+    console.warn('TimestampTrigger scheduling error:', err);
+  }
+  return false;
+}
+

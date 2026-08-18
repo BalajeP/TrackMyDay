@@ -19,6 +19,57 @@ interface ScheduledEvent {
 }
 
 let storedEvents: ScheduledEvent[] = [];
+let activeSwTimers: any[] = [];
+
+function clearSwTimers() {
+  activeSwTimers.forEach((id) => clearTimeout(id));
+  activeSwTimers = [];
+}
+
+function scheduleSwTimers() {
+  clearSwTimers();
+  if (!storedEvents || storedEvents.length === 0) return;
+
+  const nowMs = Date.now();
+
+  storedEvents.forEach((ev) => {
+    if (ev.completed) return;
+    const targetDates = Array.from(new Set([ev.date, ...(ev.notificationDates || [])]));
+
+    targetDates.forEach((dateStr) => {
+      const scheduledTime = ev.notificationTime || '08:00';
+      const scheduledMs = new Date(`${dateStr}T${scheduledTime}:00`).getTime();
+      if (!isNaN(scheduledMs)) {
+        const delayMs = scheduledMs - nowMs;
+        // Schedule if in the future within next 48 hours
+        if (delayMs > 0 && delayMs < 48 * 60 * 60 * 1000) {
+          const timerId = setTimeout(async () => {
+            const notifKey = `${ev.id}_${dateStr}_${scheduledTime}`;
+            const title = `${ev.icon || '📌'} ${ev.title}`;
+            const body = ev.date === dateStr
+              ? `🎯 Today is Event Day! (${dateStr} @ ${scheduledTime})\n${ev.todoText || ''}`
+              : `🔔 Reminder: Event scheduled for ${dateStr}\n${ev.todoText || ''}`;
+
+            try {
+              await self.registration.showNotification(title, {
+                body,
+                icon: '/icon.svg',
+                badge: '/icon.svg',
+                tag: notifKey,
+                data: { url: '/' },
+                vibrate: [200, 100, 200],
+              } as NotificationOptions);
+            } catch (err) {
+              console.error('[SW] Failed to show scheduled notification:', err);
+            }
+          }, delayMs);
+
+          activeSwTimers.push(timerId);
+        }
+      }
+    });
+  });
+}
 
 // Load stored events from SW cache on activation
 self.addEventListener('activate', (event) => {
@@ -28,6 +79,7 @@ self.addEventListener('activate', (event) => {
       if (resp) {
         try {
           storedEvents = await resp.json();
+          scheduleSwTimers();
         } catch (e) {
           console.error('[SW] Failed to parse cached events:', e);
         }
@@ -113,7 +165,7 @@ self.addEventListener('message', (event) => {
         })
       );
     });
-    // Run an immediate check for due notifications
+    scheduleSwTimers();
     event.waitUntil(checkAndFireNotifications());
   }
 });
