@@ -259,48 +259,7 @@ export default function CalendarView({
     );
   };
 
-  // Background interval checker for scheduled reminders (checks every 30s)
-  useEffect(() => {
-    const checkScheduledNotifications = () => {
-      if (notifPermission !== 'granted' || cleanEvents.length === 0) return;
-      const now = new Date();
-      const currentHHMM = format(now, 'HH:mm'); // e.g. "08:00"
-      const todayStr = format(now, 'yyyy-MM-dd');
-      const firedKey = `tmd_notif_fired_${todayStr}_${currentHHMM}`;
-
-      if (sessionStorage.getItem(firedKey)) return;
-
-      let firedAny = false;
-      cleanEvents.forEach((ev) => {
-        const eventNotifTime = ev.notificationTime || '08:00';
-        if (eventNotifTime === currentHHMM) {
-          const allDates = ev.notificationDates || [ev.date];
-          if (allDates.includes(todayStr)) {
-            const isDayMinusOne = ev.date !== todayStr;
-            const notifTitle = `${ev.icon || '📌'} ${ev.title} ${
-              isDayMinusOne ? '(Tomorrow Reminder)' : '(Today Event)'
-            }`;
-            const notifBody =
-              ev.todoText || `Reminder for ${ev.title} scheduled for ${ev.date} at 8:00 AM.`;
-
-            sendPwaNotification(notifTitle, {
-              body: notifBody,
-              icon: ev.icon,
-            });
-            firedAny = true;
-          }
-        }
-      });
-
-      if (firedAny) {
-        sessionStorage.setItem(firedKey, 'true');
-      }
-    };
-
-    const interval = setInterval(checkScheduledNotifications, 30000);
-    checkScheduledNotifications();
-    return () => clearInterval(interval);
-  }, [cleanEvents, notifPermission]);
+  // Preset sacred event helper function ends
 
   // Calendar Math
   const monthStart = startOfMonth(currentDate);
@@ -1164,9 +1123,12 @@ export default function CalendarView({
                     {/* Schedule Time Notification (Optional) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1">
-                          <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                          <span>Notification Time (Optional)</span>
+                        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                            <span>Notification Time</span>
+                          </span>
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500 font-normal">Default: 08:00 AM</span>
                         </label>
                         <input
                           type="time"
@@ -1174,6 +1136,9 @@ export default function CalendarView({
                           onChange={(e) => setNotificationTime(e.target.value)}
                           className="w-full px-3 py-2 text-xs border border-gray-300 dark:border-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                         />
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                          {notificationTime ? `Customized: Will notify at ${notificationTime} only.` : 'Default: Will notify at 08:00 AM.'}
+                        </p>
                       </div>
 
                       {/* Snooze Option (Optional) */}

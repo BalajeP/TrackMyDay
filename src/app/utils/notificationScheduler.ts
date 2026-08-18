@@ -35,6 +35,21 @@ function saveFiredNotification(key: string) {
   }
 }
 
+function formatTime12h(hhmm: string): string {
+  try {
+    const [hStr, mStr] = hhmm.split(':');
+    let h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    const mDisplay = m < 10 ? `0${m}` : `${m}`;
+    return `${h}:${mDisplay} ${ampm}`;
+  } catch (e) {
+    return hhmm;
+  }
+}
+
 export function checkAndTriggerDueEventNotifications(): number {
   if (getNotificationPermissionStatus() !== 'granted') {
     return 0;
@@ -62,7 +77,8 @@ export function checkAndTriggerDueEventNotifications(): number {
     const targetDates = Array.from(new Set([ev.date, ...(ev.notificationDates || [])]));
 
     targetDates.forEach((dateStr) => {
-      const scheduledTime = ev.notificationTime || '08:00';
+      // Use user-customized time if set, otherwise fallback to default 08:00 AM
+      const scheduledTime = (ev.notificationTime && ev.notificationTime.trim() !== '') ? ev.notificationTime.trim() : '08:00';
       const notifUniqueKey = `${ev.id}_${dateStr}_${scheduledTime}`;
       const scheduledDateTime = new Date(`${dateStr}T${scheduledTime}:00`);
       const scheduledMs = scheduledDateTime.getTime();
@@ -85,9 +101,10 @@ export function checkAndTriggerDueEventNotifications(): number {
         if (!firedSet.has(notifUniqueKey)) {
           const title = `${ev.icon || '📌'} ${ev.title}`;
           const isMainDay = ev.date === currentDateStr;
+          const timeDisplay = formatTime12h(scheduledTime);
           const body = isMainDay
-            ? `🎯 Today is Event Day! (${currentDateStr} @ ${scheduledTime})\n${ev.todoText || ''}`
-            : `🔔 Reminder: Event scheduled for ${format(parseISO(ev.date), 'MMM d, yyyy')}\n${ev.todoText || ''}`;
+            ? `🎯 Today is Event Day! (${currentDateStr} @ ${timeDisplay})\n${ev.todoText || ''}`
+            : `🔔 Reminder: Event scheduled for ${format(parseISO(ev.date), 'MMM d, yyyy')} @ ${timeDisplay}\n${ev.todoText || ''}`;
 
           sendPwaNotification(title, {
             body,
@@ -140,15 +157,16 @@ export function syncEventsToServiceWorker() {
       if (ev.completed) return;
       const targetDates = Array.from(new Set([ev.date, ...(ev.notificationDates || [])]));
       targetDates.forEach((dateStr) => {
-        const scheduledTime = ev.notificationTime || '08:00';
+        const scheduledTime = (ev.notificationTime && ev.notificationTime.trim() !== '') ? ev.notificationTime.trim() : '08:00';
         const notifUniqueKey = `${ev.id}_${dateStr}_${scheduledTime}`;
         const scheduledMs = new Date(`${dateStr}T${scheduledTime}:00`).getTime();
 
         if (!isNaN(scheduledMs) && scheduledMs > nowMs && !firedSet.has(notifUniqueKey)) {
           const title = `${ev.icon || '📌'} ${ev.title}`;
+          const timeDisplay = formatTime12h(scheduledTime);
           const body = ev.date === dateStr
-            ? `🎯 Today is Event Day! (${dateStr} @ ${scheduledTime})\n${ev.todoText || ''}`
-            : `🔔 Reminder: Event scheduled for ${dateStr}\n${ev.todoText || ''}`;
+            ? `🎯 Today is Event Day! (${dateStr} @ ${timeDisplay})\n${ev.todoText || ''}`
+            : `🔔 Reminder: Event scheduled for ${dateStr} @ ${timeDisplay}\n${ev.todoText || ''}`;
 
           scheduleExactNotificationTrigger(title, {
             body,

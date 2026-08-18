@@ -26,6 +26,28 @@ function clearSwTimers() {
   activeSwTimers = [];
 }
 
+function formatTime12h(hhmm: string): string {
+  try {
+    const [hStr, mStr] = hhmm.split(':');
+    let h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    const mDisplay = m < 10 ? `0${m}` : `${m}`;
+    return `${h}:${mDisplay} ${ampm}`;
+  } catch (e) {
+    return hhmm;
+  }
+}
+
+function getEventScheduledTime(ev: ScheduledEvent): string {
+  if (ev.notificationTime && ev.notificationTime.trim() !== '') {
+    return ev.notificationTime.trim();
+  }
+  return '08:00';
+}
+
 function scheduleSwTimers() {
   clearSwTimers();
   if (!storedEvents || storedEvents.length === 0) return;
@@ -37,7 +59,7 @@ function scheduleSwTimers() {
     const targetDates = Array.from(new Set([ev.date, ...(ev.notificationDates || [])]));
 
     targetDates.forEach((dateStr) => {
-      const scheduledTime = ev.notificationTime || '08:00';
+      const scheduledTime = getEventScheduledTime(ev);
       const scheduledMs = new Date(`${dateStr}T${scheduledTime}:00`).getTime();
       if (!isNaN(scheduledMs)) {
         const delayMs = scheduledMs - nowMs;
@@ -46,9 +68,10 @@ function scheduleSwTimers() {
           const timerId = setTimeout(async () => {
             const notifKey = `${ev.id}_${dateStr}_${scheduledTime}`;
             const title = `${ev.icon || '📌'} ${ev.title}`;
+            const timeDisplay = formatTime12h(scheduledTime);
             const body = ev.date === dateStr
-              ? `🎯 Today is Event Day! (${dateStr} @ ${scheduledTime})\n${ev.todoText || ''}`
-              : `🔔 Reminder: Event scheduled for ${dateStr}\n${ev.todoText || ''}`;
+              ? `🎯 Today is Event Day! (${dateStr} @ ${timeDisplay})\n${ev.todoText || ''}`
+              : `🔔 Reminder: Event scheduled for ${dateStr} @ ${timeDisplay}\n${ev.todoText || ''}`;
 
             try {
               await self.registration.showNotification(title, {
@@ -119,15 +142,16 @@ async function checkAndFireNotifications() {
     const targetDates = Array.from(new Set([ev.date, ...(ev.notificationDates || [])]));
     if (!targetDates.includes(currentDateStr)) continue;
 
-    const scheduledTime = ev.notificationTime || '08:00';
+    const scheduledTime = getEventScheduledTime(ev);
     if (currentTimeStr === scheduledTime) {
       const notifKey = `${ev.id}_${currentDateStr}_${scheduledTime}`;
       if (!firedSet.has(notifKey)) {
         const title = `${ev.icon || '📌'} ${ev.title}`;
         const isMainDay = ev.date === currentDateStr;
+        const timeDisplay = formatTime12h(scheduledTime);
         const body = isMainDay
-          ? `🎯 Today is Event Day! (${currentDateStr} @ ${scheduledTime})\n${ev.todoText || ''}`
-          : `🔔 Reminder: Event scheduled for ${ev.date}\n${ev.todoText || ''}`;
+          ? `🎯 Today is Event Day! (${currentDateStr} @ ${timeDisplay})\n${ev.todoText || ''}`
+          : `🔔 Reminder: Event scheduled for ${ev.date} @ ${timeDisplay}\n${ev.todoText || ''}`;
 
         await self.registration.showNotification(title, {
           body,
