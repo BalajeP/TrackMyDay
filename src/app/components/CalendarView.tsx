@@ -40,6 +40,7 @@ import {
   getNotificationPermissionStatus,
   sendPwaNotification,
 } from '../utils/notifications';
+import { syncEventsToServiceWorker } from '../utils/notificationScheduler';
 import ConfirmDialog from './ConfirmDialog';
 import {
   generate2026SacredCalendarEvents,
@@ -145,6 +146,14 @@ export default function CalendarView({
       return !REMOVED_TITHI_KEYS.some((key) => lowerTitle.includes(key) || lowerId.includes(key));
     });
   }, [events]);
+
+  // Auto sync cleanEvents to localStorage & Service Worker for background notifications
+  useEffect(() => {
+    if (cleanEvents) {
+      localStorage.setItem('tmd_calendar_events', JSON.stringify(cleanEvents));
+      syncEventsToServiceWorker();
+    }
+  }, [cleanEvents]);
 
   // PWA Notification Permission state
   const [notifPermission, setNotifPermission] = useState<NotificationPermission>(getNotificationPermissionStatus());

@@ -93,6 +93,35 @@ export function checkAndTriggerDueEventNotifications(): number {
   return triggeredCount;
 }
 
+export function syncEventsToServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    const rawEvents = localStorage.getItem('tmd_calendar_events');
+    let events: StoredEvent[] = [];
+    if (rawEvents) {
+      try {
+        events = JSON.parse(rawEvents);
+      } catch (e) {}
+    }
+
+    const sendMsg = (sw: ServiceWorker | null) => {
+      if (sw) {
+        sw.postMessage({
+          type: 'SCHEDULE_EVENTS',
+          events,
+        });
+      }
+    };
+
+    if (navigator.serviceWorker.controller) {
+      sendMsg(navigator.serviceWorker.controller);
+    } else {
+      navigator.serviceWorker.ready.then((registration) => {
+        sendMsg(registration.active);
+      });
+    }
+  }
+}
+
 let schedulerTimerId: any = null;
 
 export function startNotificationScheduler() {
@@ -101,9 +130,29 @@ export function startNotificationScheduler() {
   // Run initial check
   checkAndTriggerDueEventNotifications();
 
+  // Sync scheduled events to Service Worker for background notifications when app is closed/idle
+  syncEventsToServiceWorker();
+
+  // Register Periodic Background Sync if available
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready.then((registration: any) => {
+      syncEventsToServiceWorker();
+      if ('periodicSync' in registration) {
+        try {
+          registration.periodicSync.register('check-due-notifications', {
+            minInterval: 15 * 60 * 1000,
+          });
+        } catch (error) {
+          console.log('Periodic Background Sync error:', error);
+        }
+      }
+    });
+  }
+
   // Run check every 30 seconds
   schedulerTimerId = setInterval(() => {
     checkAndTriggerDueEventNotifications();
+    syncEventsToServiceWorker();
   }, 30000);
 }
 
@@ -113,3 +162,4 @@ export function stopNotificationScheduler() {
     schedulerTimerId = null;
   }
 }
+

@@ -20,6 +20,7 @@ import {
   Printer,
   Download,
   GripVertical,
+  Clock,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
@@ -348,6 +349,69 @@ export default function Expenditure({
       return true;
     });
   }, [partnerExpenses, selectedCategories]);
+
+  // Helper to extract timestamp from item/expense id or date string
+  const getItemOrExpenseTimestamp = useCallback((id: string, dateStr: string): number => {
+    const num = Number(id);
+    if (!isNaN(num) && num > 1000000000000) {
+      return num;
+    }
+    if (dateStr) {
+      const parsed = parseISO(dateStr).getTime();
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 0;
+  }, []);
+
+  // Format timestamp into clean date & time display string
+  const formatLastUsedTimestamp = useCallback((maxTime: number): string => {
+    if (!maxTime || maxTime <= 0) return 'Never used';
+    const d = new Date(maxTime);
+    if (isNaN(d.getTime())) return 'Never used';
+    const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0 || d.getSeconds() !== 0;
+    return hasTime ? format(d, 'MMM d, yyyy · h:mm a') : format(d, 'MMM d, yyyy');
+  }, []);
+
+  // Last used time calculation for current active filter
+  const lastUsedFilterTime = useMemo(() => {
+    let maxTime = 0;
+    filteredExpenses.forEach((exp) => {
+      if (exp.items && exp.items.length > 0) {
+        exp.items.forEach((item) => {
+          if (isDateMatchPeriod(item.date)) {
+            const ts = getItemOrExpenseTimestamp(item.id, item.date);
+            if (ts > maxTime) maxTime = ts;
+          }
+        });
+      } else if (isDateMatchPeriod(exp.date)) {
+        const ts = getItemOrExpenseTimestamp(exp.id, exp.date);
+        if (ts > maxTime) maxTime = ts;
+      }
+    });
+    return formatLastUsedTimestamp(maxTime);
+  }, [filteredExpenses, isDateMatchPeriod, getItemOrExpenseTimestamp, formatLastUsedTimestamp]);
+
+  // Last used time calculation for specific category in filter dropdown
+  const getCategoryLastUsed = useCallback(
+    (catName: string): string => {
+      let maxTime = 0;
+      partnerExpenses.forEach((exp) => {
+        if (exp.category.toLowerCase() === catName.toLowerCase()) {
+          if (exp.items && exp.items.length > 0) {
+            exp.items.forEach((item) => {
+              const ts = getItemOrExpenseTimestamp(item.id, item.date);
+              if (ts > maxTime) maxTime = ts;
+            });
+          } else {
+            const ts = getItemOrExpenseTimestamp(exp.id, exp.date);
+            if (ts > maxTime) maxTime = ts;
+          }
+        }
+      });
+      return formatLastUsedTimestamp(maxTime);
+    },
+    [partnerExpenses, getItemOrExpenseTimestamp, formatLastUsedTimestamp]
+  );
 
   // Helper to compute expense total amount for the selected period
   const getExpenseTotal = useCallback(
@@ -1028,6 +1092,10 @@ export default function Expenditure({
                                     <span className="truncate text-gray-700 font-medium">{cat}</span>
                                   </label>
 
+                                  <span className="text-[10px] text-gray-400 font-normal ml-auto mr-1.5 flex-shrink-0" title={`Last used: ${getCategoryLastUsed(cat)}`}>
+                                    {getCategoryLastUsed(cat)}
+                                  </span>
+
                                   <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                                     <button
                                       onClick={(e) => {
@@ -1076,43 +1144,52 @@ export default function Expenditure({
             </div>
           </div>
 
-          {/* Active Filter Chips (Chipset) Listed Below */}
-          <div className="flex items-center gap-2 flex-wrap text-xs pt-0.5">
-            <span className="font-semibold text-gray-500 flex items-center gap-1">
-              <Tag className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Selected Chipset:</span>
-            </span>
-
-            {selectedCategories.length === 0 ? (
-              <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
-                All Categories
+          {/* Active Filter Chips (Chipset) & Last Used Time Bar */}
+          <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-gray-100 mt-1">
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              <span className="font-semibold text-gray-500 flex items-center gap-1">
+                <Tag className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Selected Chipset:</span>
               </span>
-            ) : (
-              <>
-                {selectedCategories.map((cat) => (
-                  <span
-                    key={cat}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-600 text-white shadow-xs"
-                  >
-                    <span>{cat}</span>
-                    <button
-                      onClick={() => toggleCategoryFilter(cat)}
-                      className="hover:bg-indigo-700 rounded-full p-0.5 transition-colors"
-                      title={`Remove ${cat} filter`}
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
 
-                <button
-                  onClick={() => toggleCategoryFilter('all')}
-                  className="text-[11px] text-gray-500 hover:text-indigo-600 underline font-medium ml-1"
-                >
-                  Clear All
-                </button>
-              </>
-            )}
+              {selectedCategories.length === 0 ? (
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-100">
+                  All Categories
+                </span>
+              ) : (
+                <>
+                  {selectedCategories.map((cat) => (
+                    <span
+                      key={cat}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-600 text-white shadow-xs"
+                    >
+                      <span>{cat}</span>
+                      <button
+                        onClick={() => toggleCategoryFilter(cat)}
+                        className="hover:bg-indigo-700 rounded-full p-0.5 transition-colors"
+                        title={`Remove ${cat} filter`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+
+                  <button
+                    onClick={() => toggleCategoryFilter('all')}
+                    className="text-[11px] text-gray-500 hover:text-indigo-600 underline font-medium ml-1"
+                  >
+                    Clear All
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Last Used Time Display under filter */}
+            <div className="flex items-center gap-1.5 text-xs text-gray-600 bg-indigo-50/70 border border-indigo-100 px-3 py-1 rounded-lg shadow-2xs">
+              <Clock className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="font-medium text-gray-500">Last used time:</span>
+              <span className="font-bold text-indigo-950">{lastUsedFilterTime}</span>
+            </div>
           </div>
         </div>
 
