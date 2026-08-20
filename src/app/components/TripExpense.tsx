@@ -46,10 +46,12 @@ interface Props {
   partner1Name: string;
   partner2Name: string;
   accessToken: string | null;
+  allowedTripIds?: string[];
+  isReadOnly?: boolean;
   onChangeState?: (hasUnsavedChanges: boolean, saveFn: () => void) => void;
 }
 
-export default function TripExpense({ activePerson, partner1Name, partner2Name, accessToken, onChangeState }: Props) {
+export default function TripExpense({ activePerson, partner1Name, partner2Name, accessToken, allowedTripIds, isReadOnly, onChangeState }: Props) {
   // Persistence using useSupabasePersistedState
   const [state, setState, saveState, hasUnsavedChanges, isLoaded] = useSupabasePersistedState<TripExpenseState>(
     'trip_expenses',
@@ -675,15 +677,30 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     return ['date', 'expense_for', 'total_amount', 'spender'].includes(colId);
   };
 
+  const visibleTrips = useMemo(() => {
+    const rawTrips = activeState.trips || [];
+    if (!allowedTripIds || allowedTripIds.includes('*')) {
+      return rawTrips;
+    }
+    return rawTrips.filter(
+      (t) => allowedTripIds.includes(t.id) || allowedTripIds.includes(t.title)
+    );
+  }, [activeState.trips, allowedTripIds]);
+
   return (
     <div className="space-y-6">
-      {/* Global Card for Trip Expense Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-4 mb-6">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Trip Expense</h1>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Manage and track splitting for multiple trips</p>
-          </div>
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-xs border border-gray-100 dark:border-gray-700">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <span>Trip Expenses</span>
+          </h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            Manage custom trips, columns, entries, and automatic calculations
+          </p>
+        </div>
+
+        {!isReadOnly && (
           <button
             onClick={handleAddTrip}
             className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -691,22 +708,25 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
             <Plus className="w-4 h-4" />
             Add New Trip
           </button>
-        </div>
+        )}
+      </div>
 
-        {/* Trips List */}
-        <div className="space-y-6">
-          {activeState.trips.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 dark:text-gray-500 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
-              <p className="text-sm font-medium">No trips registered yet.</p>
+      {/* Trips List */}
+      <div className="space-y-6">
+        {visibleTrips.length === 0 ? (
+          <div className="text-center py-12 text-gray-400 dark:text-gray-500 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
+            <p className="text-sm font-medium">No trip expenses assigned or available.</p>
+            {!isReadOnly && (
               <button
                 onClick={handleAddTrip}
                 className="mt-3 text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
               >
                 Create your first trip tracker
               </button>
-            </div>
-          ) : (
-            activeState.trips.map((trip) => {
+            )}
+          </div>
+        ) : (
+          visibleTrips.map((trip) => {
               const filteredEntries = getFilteredEntries(trip);
               const tripTotals = calculateTotals(trip, filteredEntries);
 
@@ -1203,7 +1223,6 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
             })
           )}
         </div>
-      </div>
 
       {/* Confirm Dialogs */}
       {confirmDelete && (

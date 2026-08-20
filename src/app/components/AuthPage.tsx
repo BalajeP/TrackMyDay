@@ -13,8 +13,8 @@ interface Props {
 export default function AuthPage({ onLogin, onSignup, onResetPassword, error, clearError }: Props) {
   const { isInstallable, promptInstall } = usePWA();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot_password'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('slbbalaje@gmail.com');
+  const [password, setPassword] = useState('Bala@1503');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -151,16 +151,18 @@ export default function AuthPage({ onLogin, onSignup, onResetPassword, error, cl
               </div>
             )}
 
-            {/* Email */}
+            {/* Email / Username */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5">Email address</label>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1.5">
+                {mode === 'login' ? 'Username or Email address' : 'Email address'}
+              </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
                 <input
-                  type="email"
+                  type={mode === 'login' ? 'text' : 'email'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder={mode === 'login' ? 'slbbalaje@gmail.com or username' : 'you@example.com'}
                   required
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
                 />

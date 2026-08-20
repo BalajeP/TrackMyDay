@@ -57,6 +57,8 @@ interface Props {
   partner1Name: string;
   partner2Name: string;
   accessToken: string | null;
+  allowedTripIds?: string[];
+  isReadOnly?: boolean;
   onUnsavedChanges?: (hasChanges: boolean, save: () => void) => void;
 }
 
@@ -145,6 +147,8 @@ export default function Expenditure({
   partner1Name,
   partner2Name,
   accessToken,
+  allowedTripIds,
+  isReadOnly,
   onUnsavedChanges,
 }: Props) {
   const [expenseTab, setExpenseTab] = useState<ExpenseTab>('daily');
@@ -1596,6 +1600,8 @@ export default function Expenditure({
           partner1Name={partner1Name}
           partner2Name={partner2Name}
           accessToken={accessToken}
+          allowedTripIds={allowedTripIds}
+          isReadOnly={isReadOnly}
           onChangeState={handleTripStateChange}
         />
       </div>

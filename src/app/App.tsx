@@ -1,5 +1,34 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Calendar, Activity, Utensils, Dumbbell, DollarSign, Target, Users, Pencil, X, Camera, Smile, Type, ListChecks, LogOut, Loader2, Download, Settings, Sun, Moon, Check, Globe } from 'lucide-react';
+import {
+  Calendar,
+  Activity,
+  Utensils,
+  Dumbbell,
+  DollarSign,
+  Users,
+  Pencil,
+  X,
+  Camera,
+  Smile,
+  Type,
+  ListChecks,
+  LogOut,
+  Loader2,
+  Download,
+  Settings,
+  Sun,
+  Moon,
+  Globe,
+  UserPlus,
+  Trash2,
+  Edit2,
+  CheckSquare,
+  Square,
+  AlertCircle,
+  Check,
+  Eye,
+  Lock,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import DailyActivities from './components/DailyActivities';
 import MealSchedule from './components/MealSchedule';
@@ -9,11 +38,12 @@ import CalendarView from './components/CalendarView';
 import Tracking from './components/Tracking';
 import AuthPage from './components/AuthPage';
 import PWAWrapper from './components/PWAWrapper';
-import { useAuth } from './hooks/useAuth';
+import { useAuth, AppUserRecord, AppUserProfile } from './hooks/useAuth';
 import { useSupabasePersistedState } from './hooks/useSupabasePersistedState';
 import { usePWA } from './hooks/usePWA';
 import { Language, t } from './utils/translations';
 import { startNotificationScheduler, stopNotificationScheduler } from './utils/notificationScheduler';
+import { supabase } from '../lib/supabaseClient';
 
 type Tab = 'activities' | 'meals' | 'workout' | 'expenses' | 'calendar' | 'tracking';
 type Person = 'partner1' | 'partner2' | 'both';
@@ -64,9 +94,18 @@ interface AppConfig {
 const DEFAULT_CONFIG: AppConfig = {
   partner1: DEFAULT_PARTNER1,
   partner2: DEFAULT_PARTNER2,
-  activePerson: 'partner1', // Default to partner1 instead of 'both'
+  activePerson: 'partner1',
   activeTab: 'activities',
 };
+
+const COMPONENT_OPTIONS: { id: Tab; label: string }[] = [
+  { id: 'expenses', label: 'Trip Expense' },
+  { id: 'activities', label: 'Daily Activities' },
+  { id: 'tracking', label: 'Tracking Reminders' },
+  { id: 'meals', label: 'Meal Schedule' },
+  { id: 'workout', label: 'Workout Schedule' },
+  { id: 'calendar', label: 'Calendar View' },
+];
 
 // ── Avatar display ────────────────────────────────────────────────────────────
 function Avatar({ profile, size = 'md' }: { profile: PartnerProfile; size?: 'sm' | 'md' | 'lg' }) {
@@ -83,30 +122,215 @@ function Avatar({ profile, size = 'md' }: { profile: PartnerProfile; size?: 'sm'
   );
 }
 
-// ── Settings Modal ────────────────────────────────────────────────────────────
+// ── Settings Modal with User Management & Trip Control for Main Admin ──────────
 function SettingsModal({
   theme,
   onThemeChange,
   lang,
   onLangChange,
+  userProfile,
+  fetchAppUsers,
+  createAppUser,
+  updateAppUser,
+  deleteAppUser,
   onClose,
 }: {
   theme: ThemeMode;
   onThemeChange: (t: ThemeMode) => void;
   lang: Language;
   onLangChange: (l: Language) => void;
+  userProfile: AppUserProfile | null;
+  fetchAppUsers: () => Promise<AppUserRecord[]>;
+  createAppUser: (newUser: Omit<AppUserRecord, 'id'>) => Promise<{ success: boolean; error?: string }>;
+  updateAppUser: (id: string, updates: Partial<AppUserRecord>) => Promise<{ success: boolean; error?: string }>;
+  deleteAppUser: (id: string) => Promise<{ success: boolean; error?: string }>;
   onClose: () => void;
 }) {
+  const isMainAdmin = userProfile?.isMainAdmin || false;
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'users'>('general');
+
+  // User Management State
+  const [usersList, setUsersList] = useState<AppUserRecord[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+
+  // Available Trips fetched from database
+  const [availableTrips, setAvailableTrips] = useState<{ id: string; title: string }[]>([]);
+
+  // New User Form State
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [accessLevel, setAccessLevel] = useState<'edit' | 'view_only'>('edit');
+  const [allowedComponents, setAllowedComponents] = useState<string[]>(['expenses']);
+  const [allowedTripIds, setAllowedTripIds] = useState<string[]>(['*']);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
   const languages: { id: Language; label: string; flag: string }[] = [
     { id: 'en', label: 'English', flag: '🇬🇧' },
     { id: 'ta', label: 'தமிழ்', flag: '🇮🇳' },
     { id: 'hi', label: 'हिन्दी', flag: '🇮🇳' },
   ];
 
+  const loadUsers = useCallback(async () => {
+    if (!isMainAdmin) return;
+    setLoadingUsers(true);
+    const data = await fetchAppUsers();
+    setUsersList(data);
+    setLoadingUsers(false);
+  }, [isMainAdmin, fetchAppUsers]);
+
+  const loadTrips = useCallback(async () => {
+    if (!isMainAdmin) return;
+    try {
+      const { data } = await supabase
+        .from('user_data')
+        .select('data_value')
+        .eq('data_key', 'trip_expenses')
+        .maybeSingle();
+
+      if (data && data.data_value && Array.isArray(data.data_value.trips)) {
+        setAvailableTrips(data.data_value.trips.map((t: any) => ({ id: t.id, title: t.title || 'Untitled Trip' })));
+      }
+    } catch (err) {
+      console.error('Failed to load trips for user management:', err);
+    }
+  }, [isMainAdmin]);
+
+  useEffect(() => {
+    if (activeSettingsTab === 'users') {
+      loadUsers();
+      loadTrips();
+    }
+  }, [activeSettingsTab, loadUsers, loadTrips]);
+
+  const resetForm = () => {
+    setUsername('');
+    setEmail('');
+    setName('');
+    setPassword('');
+    setAccessLevel('edit');
+    setAllowedComponents(['expenses']);
+    setAllowedTripIds(['*']);
+    setFormError(null);
+    setFormSuccess(null);
+    setShowAddForm(false);
+    setEditingUserId(null);
+  };
+
+  const handleToggleComponent = (compId: string) => {
+    setAllowedComponents((prev) =>
+      prev.includes(compId) ? prev.filter((c) => c !== compId) : [...prev, compId]
+    );
+  };
+
+  const handleToggleTrip = (tripId: string) => {
+    if (tripId === '*') {
+      setAllowedTripIds(['*']);
+      return;
+    }
+    setAllowedTripIds((prev) => {
+      const filtered = prev.filter((id) => id !== '*');
+      if (filtered.includes(tripId)) {
+        const next = filtered.filter((id) => id !== tripId);
+        return next.length === 0 ? ['*'] : next;
+      } else {
+        return [...filtered, tripId];
+      }
+    });
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    setFormSuccess(null);
+
+    if (!username.trim()) { setFormError('Please enter a username.'); return; }
+    if (!email.trim()) { setFormError('Please enter an email.'); return; }
+    if (!name.trim()) { setFormError('Please enter a name.'); return; }
+    if (!password || password.length < 4) { setFormError('Password must be at least 4 characters.'); return; }
+    if (allowedComponents.length === 0) { setFormError('Select at least one allowed component.'); return; }
+
+    setSubmitting(true);
+    try {
+      if (editingUserId) {
+        // Update existing user
+        const res = await updateAppUser(editingUserId, {
+          username: username.trim(),
+          email: email.trim(),
+          name: name.trim(),
+          password,
+          access_level: accessLevel,
+          allowed_components: allowedComponents,
+          allowed_trip_ids: allowedTripIds,
+        });
+        if (!res.success) {
+          setFormError(res.error || 'Failed to update user.');
+        } else {
+          setFormSuccess('User updated successfully!');
+          resetForm();
+          loadUsers();
+        }
+      } else {
+        // Create new user
+        const res = await createAppUser({
+          username: username.trim().toLowerCase(),
+          email: email.trim().toLowerCase(),
+          name: name.trim(),
+          password,
+          role: 'subadmin',
+          access_level: accessLevel,
+          allowed_components: allowedComponents,
+          allowed_trip_ids: allowedTripIds,
+        });
+        if (!res.success) {
+          setFormError(res.error || 'Failed to create user. Username/email might already exist.');
+        } else {
+          setFormSuccess('Sub-Admin / Trip User created successfully!');
+          resetForm();
+          loadUsers();
+        }
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const startEditUser = (user: AppUserRecord) => {
+    setEditingUserId(user.id);
+    setUsername(user.username);
+    setEmail(user.email);
+    setName(user.name);
+    setPassword(user.password || '');
+    setAccessLevel((user.access_level as 'edit' | 'view_only') || 'edit');
+    setAllowedComponents(Array.isArray(user.allowed_components) ? user.allowed_components : ['expenses']);
+    setAllowedTripIds(Array.isArray(user.allowed_trip_ids) && user.allowed_trip_ids.length > 0 ? user.allowed_trip_ids : ['*']);
+    setShowAddForm(true);
+    setFormError(null);
+    setFormSuccess(null);
+  };
+
+  const handleDeleteUser = async (user: AppUserRecord) => {
+    if (!window.confirm(`Are you sure you want to remove user "${user.name}" (${user.username})? They will no longer be allowed to log in.`)) {
+      return;
+    }
+    const res = await deleteAppUser(user.id);
+    if (res.success) {
+      loadUsers();
+    } else {
+      alert(`Error deleting user: ${res.error}`);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 dark:border-gray-700">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 dark:border-gray-700 max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
           <div className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             <h2 className="font-bold text-gray-900 dark:text-gray-100">{t('settingsTitle', lang)}</h2>
@@ -116,67 +340,453 @@ function SettingsModal({
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
-          {/* Language Selection */}
-          <div>
-            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <Globe className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-              <span>{t('languageSelection', lang)}</span>
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {languages.map((l) => (
-                <button
-                  key={l.id}
-                  onClick={() => onLangChange(l.id)}
-                  className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border-2 transition-all ${
-                    lang === l.id
-                      ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
-                      : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                  }`}
-                >
-                  <span className="text-xl">{l.flag}</span>
-                  <span className="text-xs font-semibold">{l.label}</span>
-                </button>
-              ))}
-            </div>
+        {/* Tab switch for Main Admin */}
+        {isMainAdmin && (
+          <div className="flex border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 px-5 pt-2 flex-shrink-0">
+            <button
+              onClick={() => setActiveSettingsTab('general')}
+              className={`pb-2.5 px-4 text-xs font-bold transition-all border-b-2 ${
+                activeSettingsTab === 'general'
+                  ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              General Settings
+            </button>
+            <button
+              onClick={() => setActiveSettingsTab('users')}
+              className={`pb-2.5 px-4 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 ${
+                activeSettingsTab === 'users'
+                  ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>User Management</span>
+              <span className="bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                Admin
+              </span>
+            </button>
           </div>
+        )}
 
-          {/* Theme Switcher */}
-          <div>
-            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2.5">
-              {t('appearanceTheme', lang)}
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => onThemeChange('light')}
-                className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${
-                  theme === 'light'
-                    ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 font-bold shadow-xs'
-                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                }`}
-              >
-                <Sun className="w-5 h-5 text-amber-500" />
-                <span className="text-xs">{t('lightMode', lang)}</span>
-                {theme === 'light' && <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full">{t('active', lang)}</span>}
-              </button>
+        {/* Body Content */}
+        <div className="p-5 overflow-y-auto flex-1 space-y-5">
+          {activeSettingsTab === 'general' ? (
+            <>
+              {/* Language Selection */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <Globe className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>{t('languageSelection', lang)}</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {languages.map((l) => (
+                    <button
+                      key={l.id}
+                      onClick={() => onLangChange(l.id)}
+                      className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border-2 transition-all ${
+                        lang === l.id
+                          ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
+                          : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                      }`}
+                    >
+                      <span className="text-xl">{l.flag}</span>
+                      <span className="text-xs font-semibold">{l.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-              <button
-                onClick={() => onThemeChange('dark')}
-                className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${
-                  theme === 'dark'
-                    ? 'border-indigo-500 bg-gray-900 text-indigo-400 font-bold shadow-xs'
-                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                }`}
-              >
-                <Moon className="w-5 h-5 text-indigo-400" />
-                <span className="text-xs">{t('darkMode', lang)}</span>
-                {theme === 'dark' && <span className="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded-full">{t('active', lang)}</span>}
-              </button>
+              {/* Theme Switcher */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2.5">
+                  {t('appearanceTheme', lang)}
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => onThemeChange('light')}
+                    className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${
+                      theme === 'light'
+                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 font-bold shadow-xs'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                    }`}
+                  >
+                    <Sun className="w-5 h-5 text-amber-500" />
+                    <span className="text-xs">{t('lightMode', lang)}</span>
+                    {theme === 'light' && <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full">{t('active', lang)}</span>}
+                  </button>
+
+                  <button
+                    onClick={() => onThemeChange('dark')}
+                    className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${
+                      theme === 'dark'
+                        ? 'border-indigo-500 bg-gray-900 text-indigo-400 font-bold shadow-xs'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                    }`}
+                  >
+                    <Moon className="w-5 h-5 text-indigo-400" />
+                    <span className="text-xs">{t('darkMode', lang)}</span>
+                    {theme === 'dark' && <span className="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded-full">{t('active', lang)}</span>}
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            /* User Management Tab for Main Admin */
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Sub-Admins & Trip Users</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Manage user credentials, component access, trip access & permissions</p>
+                </div>
+                {!showAddForm && (
+                  <button
+                    onClick={() => { resetForm(); setShowAddForm(true); }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-xs"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>Create User</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Form Alert Messages */}
+              {formError && (
+                <div className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-xs text-red-700 dark:text-red-300">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+              {formSuccess && (
+                <div className="p-3 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2 text-xs text-green-700 dark:text-green-300">
+                  <Check className="w-4 h-4 flex-shrink-0" />
+                  <span>{formSuccess}</span>
+                </div>
+              )}
+
+              {/* Add / Edit Form */}
+              {showAddForm && (
+                <form onSubmit={handleCreateUser} className="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-700 space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
+                    <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                      {editingUserId ? 'Edit Sub-Admin / Trip User' : 'Create New Sub-Admin / Trip User'}
+                    </h4>
+                    <button type="button" onClick={resetForm} className="text-gray-400 hover:text-gray-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Username</label>
+                      <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="e.g. tripuser1"
+                        required
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="user@example.com"
+                        required
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Full Name</label>
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. Alex Smith"
+                        required
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Password</label>
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        minLength={4}
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Access Level Selector */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1.5">
+                      Access Permission Level:
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAccessLevel('edit')}
+                        className={`p-2 rounded-lg border text-left text-xs transition-colors flex items-center gap-2 ${
+                          accessLevel === 'edit'
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold'
+                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+                        }`}
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                        <div>
+                          <div className="font-semibold text-xs">Edit Access</div>
+                          <div className="text-[9px] text-gray-400">Can view, add, edit & delete</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAccessLevel('view_only')}
+                        className={`p-2 rounded-lg border text-left text-xs transition-colors flex items-center gap-2 ${
+                          accessLevel === 'view_only'
+                            ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold'
+                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+                        }`}
+                      >
+                        <Eye className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                        <div>
+                          <div className="font-semibold text-xs">View Only</div>
+                          <div className="text-[9px] text-gray-400">Read-only, editing disabled</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Component Access Checkboxes */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1.5">
+                      Allowed Component Access:
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {COMPONENT_OPTIONS.map((comp) => {
+                        const isSelected = allowedComponents.includes(comp.id);
+                        return (
+                          <button
+                            key={comp.id}
+                            type="button"
+                            onClick={() => handleToggleComponent(comp.id)}
+                            className={`flex items-center gap-2 p-2 rounded-lg border text-left text-xs transition-colors ${
+                              isSelected
+                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold'
+                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+                            }`}
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                            ) : (
+                              <Square className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                            )}
+                            <span className="truncate">{comp.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Specific Trip Expenses Selection */}
+                  {allowedComponents.includes('expenses') && (
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1.5 flex items-center justify-between">
+                        <span>Assigned Trip Expenses:</span>
+                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-normal">Control which trips user can see</span>
+                      </label>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTrip('*')}
+                          className={`flex items-center gap-2 p-2 rounded-lg border text-left text-xs transition-colors ${
+                            allowedTripIds.includes('*')
+                              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold'
+                              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+                          }`}
+                        >
+                          {allowedTripIds.includes('*') ? (
+                            <CheckSquare className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                          ) : (
+                            <Square className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                          )}
+                          <span className="truncate font-semibold">All Trips (*)</span>
+                        </button>
+
+                        {availableTrips.map((t) => {
+                          const isSelected = !allowedTripIds.includes('*') && allowedTripIds.includes(t.id);
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => handleToggleTrip(t.id)}
+                              className={`flex items-center gap-2 p-2 rounded-lg border text-left text-xs transition-colors ${
+                                isSelected
+                                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold'
+                                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+                              }`}
+                            >
+                              {isSelected ? (
+                                <CheckSquare className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                              ) : (
+                                <Square className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                              )}
+                              <span className="truncate">{t.title}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 disabled:opacity-60"
+                    >
+                      {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <span>{editingUserId ? 'Save Changes' : 'Create User'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={resetForm}
+                      className="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-lg hover:bg-gray-300 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Users List */}
+              {loadingUsers ? (
+                <div className="flex justify-center py-6 text-gray-400">
+                  <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                </div>
+              ) : usersList.length === 0 ? (
+                <div className="text-center py-6 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
+                  <Users className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">No sub-admin or trip users created yet.</p>
+                  <button
+                    onClick={() => { resetForm(); setShowAddForm(true); }}
+                    className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
+                  >
+                    + Add your first user
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {usersList.map((u) => {
+                    const isViewOnly = u.access_level === 'view_only';
+                    return (
+                      <div
+                        key={u.id}
+                        className="p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-2xs flex flex-col gap-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold text-xs">
+                              {u.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{u.name}</span>
+                                <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.2 rounded-full font-mono">
+                                  @{u.username}
+                                </span>
+                                {isViewOnly ? (
+                                  <span className="text-[9px] bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5">
+                                    <Eye className="w-2.5 h-2.5" /> View Only
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5">
+                                    <Pencil className="w-2.5 h-2.5" /> Edit Access
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-gray-400 dark:text-gray-400">{u.email}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => startEditUser(u)}
+                              title="Edit User & Permissions"
+                              className="p-1.5 text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(u)}
+                              title="Delete User"
+                              className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Allowed Components & Trips Badges */}
+                        <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-gray-50 dark:border-gray-700/60">
+                          <span className="text-[10px] text-gray-400 font-medium">Access:</span>
+                          {Array.isArray(u.allowed_components) && u.allowed_components.length > 0 ? (
+                            u.allowed_components.map((c) => {
+                              const compLabel = COMPONENT_OPTIONS.find((opt) => opt.id === c)?.label || c;
+                              return (
+                                <span
+                                  key={c}
+                                  className="text-[9px] bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.2 rounded-md font-medium"
+                                >
+                                  {compLabel}
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span className="text-[9px] text-red-500 italic">No components assigned</span>
+                          )}
+
+                          {/* Assigned Trips Badge */}
+                          <span className="text-[10px] text-gray-400 font-medium ml-1">Trips:</span>
+                          {!u.allowed_trip_ids || u.allowed_trip_ids.includes('*') ? (
+                            <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.2 rounded-md font-medium">
+                              All Trips (*)
+                            </span>
+                          ) : (
+                            u.allowed_trip_ids.map((tid) => {
+                              const tripObj = availableTrips.find((at) => at.id === tid);
+                              return (
+                                <span
+                                  key={tid}
+                                  className="text-[9px] bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-1.5 py-0.2 rounded-md font-medium"
+                                >
+                                  {tripObj?.title || tid}
+                                </span>
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
 
-        <div className="px-5 pb-5">
+        <div className="px-5 pb-5 pt-2 flex-shrink-0 border-t border-gray-100 dark:border-gray-700">
           <button
             onClick={onClose}
             className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-xs transition-colors"
@@ -303,7 +913,22 @@ function PartnerButton({ profile, active, onSelect, onEdit }: { profile: Partner
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { accessToken, loading: authLoading, error: authError, login, signup, logout, resetPassword, clearError } = useAuth();
+  const {
+    userProfile,
+    accessToken,
+    loading: authLoading,
+    error: authError,
+    login,
+    signup,
+    logout,
+    resetPassword,
+    clearError,
+    fetchAppUsers,
+    createAppUser,
+    updateAppUser,
+    deleteAppUser,
+  } = useAuth();
+
   const { isInstallable, promptInstall } = usePWA();
 
   const [config, setConfig, saveConfig] = useSupabasePersistedState<AppConfig>('app_config', DEFAULT_CONFIG, DEFAULT_CONFIG, accessToken);
@@ -355,7 +980,6 @@ export default function App() {
 
   const { partner1, activeTab } = config;
   const activePerson = 'partner1' as Person;
-  const partner2 = { name: '', avatarType: 'letter' as const, letter: 'P', bgColor: '#ec4899' };
 
   const setPartner1 = (p: PartnerProfile) => {
     setConfig((s) => ({ ...s, partner1: p }));
@@ -386,7 +1010,7 @@ export default function App() {
     setTimeout(saveTracking, 0);
   };
 
-  const tabs = [
+  const allTabs = [
     { id: 'activities' as Tab, label: t('activities', lang), icon: Activity },
     { id: 'tracking' as Tab, label: t('tracking', lang), icon: ListChecks },
     { id: 'meals' as Tab, label: t('meals', lang), icon: Utensils },
@@ -395,7 +1019,29 @@ export default function App() {
     { id: 'calendar' as Tab, label: t('calendar', lang), icon: Calendar },
   ];
 
-  const sharedProps = { activePerson, partner1Name: partner1.name, partner2Name: '', accessToken, lang };
+  // Component access control filtering for sub-users
+  const allowedComponents = userProfile?.allowedComponents || ['expenses'];
+  const allowedTripIds = userProfile?.allowedTripIds || ['*'];
+  const tabs = allTabs.filter((tab) => allowedComponents.includes(tab.id));
+  const isReadOnly = userProfile?.accessLevel === 'view_only';
+
+  // Ensure current active tab is permitted for user, otherwise switch to first allowed tab
+  useEffect(() => {
+    if (tabs.length > 0 && !allowedComponents.includes(config.activeTab)) {
+      const fallbackTab = (tabs[0]?.id || 'expenses') as Tab;
+      setConfig((s) => ({ ...s, activeTab: fallbackTab }));
+    }
+  }, [allowedComponents, config.activeTab, setConfig, tabs]);
+
+  const sharedProps = {
+    activePerson,
+    partner1Name: partner1.name,
+    partner2Name: '',
+    accessToken,
+    lang,
+    isReadOnly,
+    allowedTripIds,
+  };
 
   if (authLoading) {
     return (
@@ -427,7 +1073,19 @@ export default function App() {
             <div className="flex items-center gap-3 min-w-0">
               <Users className="w-7 h-7 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
               <div className="min-w-0">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">{t('appName', lang)}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">{t('appName', lang)}</h1>
+                  {userProfile?.isMainAdmin ? (
+                    <span className="bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      Main Admin
+                    </span>
+                  ) : (
+                    <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                      {isReadOnly ? <Eye className="w-3 h-3 text-amber-600" /> : <Pencil className="w-3 h-3" />}
+                      {userProfile?.name} ({isReadOnly ? 'View Only' : 'Edit Access'})
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-gray-400 dark:text-gray-400 mt-0.5">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
               </div>
             </div>
@@ -481,12 +1139,30 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'activities' && <DailyActivities {...sharedProps} trackingReminders={trackingReminders} onUpdateTrackingReminders={updateTrackingReminders} onUnsavedChanges={handleUnsavedChanges} />}
-        {activeTab === 'meals'      && <MealSchedule {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
-        {activeTab === 'workout'    && <WorkoutSchedule {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
-        {activeTab === 'expenses'   && <Expenditure {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
-        {activeTab === 'calendar'   && <CalendarView {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
-        {activeTab === 'tracking'   && <Tracking {...sharedProps} reminders={trackingReminders} onAddReminder={addTrackingReminder} onUpdateReminders={updateTrackingReminders} onUnsavedChanges={handleUnsavedChanges} />}
+        {/* Read Only Banner */}
+        {isReadOnly && (
+          <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 rounded-2xl flex items-center justify-between text-xs text-amber-800 dark:text-amber-300 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-amber-700 dark:text-amber-300 flex-shrink-0">
+                <Eye className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-bold text-sm block">View Only Access Mode</span>
+                <span className="text-amber-700 dark:text-amber-400">You have read-only permissions for this component assigned by admin. Data modifications are restricted.</span>
+              </div>
+            </div>
+            <span className="bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200 text-[10px] px-2.5 py-1 rounded-full font-extrabold uppercase tracking-wider">
+              Read Only
+            </span>
+          </div>
+        )}
+
+        {activeTab === 'activities' && allowedComponents.includes('activities') && <DailyActivities {...sharedProps} trackingReminders={trackingReminders} onUpdateTrackingReminders={updateTrackingReminders} onUnsavedChanges={handleUnsavedChanges} />}
+        {activeTab === 'meals'      && allowedComponents.includes('meals')      && <MealSchedule {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
+        {activeTab === 'workout'    && allowedComponents.includes('workout')    && <WorkoutSchedule {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
+        {activeTab === 'expenses'   && allowedComponents.includes('expenses')   && <Expenditure {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
+        {activeTab === 'calendar'   && allowedComponents.includes('calendar')   && <CalendarView {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
+        {activeTab === 'tracking'   && allowedComponents.includes('tracking')   && <Tracking {...sharedProps} reminders={trackingReminders} onAddReminder={addTrackingReminder} onUpdateReminders={updateTrackingReminders} onUnsavedChanges={handleUnsavedChanges} />}
       </main>
 
       {/* Unsaved changes navigation guard */}
@@ -551,6 +1227,11 @@ export default function App() {
           onThemeChange={setTheme}
           lang={lang}
           onLangChange={setLang}
+          userProfile={userProfile}
+          fetchAppUsers={fetchAppUsers}
+          createAppUser={createAppUser}
+          updateAppUser={updateAppUser}
+          deleteAppUser={deleteAppUser}
           onClose={() => setShowSettingsModal(false)}
         />
       )}
