@@ -162,7 +162,7 @@ export default function AuthPage({ onLogin, onSignup, onResetPassword, error, cl
                   type={mode === 'login' ? 'text' : 'email'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={mode === 'login' ? 'slbbalaje@gmail.com or username' : 'you@example.com'}
+                  placeholder={mode === 'login' ? 'Enter username or email address' : 'you@example.com'}
                   required
                   className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
                 />
