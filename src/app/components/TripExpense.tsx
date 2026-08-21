@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
-import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical, Zap, UserX, UserCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -76,6 +76,103 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
   // Tracking rotating/spinning state of refresh icons per trip: tripId -> boolean
   const [spinningTrip, setSpinningTrip] = useState<Record<string, boolean>>({});
 
+  const [splitPopover, setSplitPopover] = useState<{
+    tripId: string;
+    entryId: string;
+    mode: 'all' | 'exclude' | 'include';
+    selectedCols: string[];
+  } | null>(null);
+
+  const splitPopoverRef = useRef<HTMLDivElement>(null);
+
+  // Close split popover on outside click
+  useEffect(() => {
+    if (!splitPopover) return;
+    const handler = (e: MouseEvent) => {
+      if (splitPopoverRef.current && !splitPopoverRef.current.contains(e.target as Node)) {
+        setSplitPopover(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [splitPopover]);
+
+  // Perform Split Equally across all split columns
+  const applySplitEquallyAll = (tripId: string, entryId: string) => {
+    const trip = activeState.trips.find((t) => t.id === tripId);
+    if (!trip) return;
+
+    const splitCols = trip.columns.filter((c) => c.type === 'split');
+    if (splitCols.length === 0) return;
+
+    const currentBuffer = editBuffers[tripId]?.[entryId] || {};
+    const totalAmount = parseFloat(currentBuffer['total_amount'] || '0');
+
+    const perPerson = totalAmount > 0 ? (totalAmount / splitCols.length).toFixed(2) : '0.00';
+
+    setEditBuffers((prev) => {
+      const tripBufs = { ...(prev[tripId] || {}) };
+      const entryBuf = { ...(tripBufs[entryId] || {}) };
+
+      splitCols.forEach((col) => {
+        entryBuf[col.id] = perPerson;
+      });
+
+      tripBufs[entryId] = entryBuf;
+      return { ...prev, [tripId]: tripBufs };
+    });
+  };
+
+  // Perform Exclude / Include Split
+  const applyCustomSplit = (
+    tripId: string,
+    entryId: string,
+    mode: 'exclude' | 'include',
+    selectedColIds: string[]
+  ) => {
+    const trip = activeState.trips.find((t) => t.id === tripId);
+    if (!trip) return;
+
+    const splitCols = trip.columns.filter((c) => c.type === 'split');
+    if (splitCols.length === 0) return;
+
+    const currentBuffer = editBuffers[tripId]?.[entryId] || {};
+    const totalAmount = parseFloat(currentBuffer['total_amount'] || '0');
+
+    let activeCols: TripColumn[] = [];
+    let inactiveCols: TripColumn[] = [];
+
+    if (mode === 'exclude') {
+      // In Exclude mode, checked columns are EXCLUDED (inactive), non-checked are active
+      activeCols = splitCols.filter((c) => !selectedColIds.includes(c.id));
+      inactiveCols = splitCols.filter((c) => selectedColIds.includes(c.id));
+    } else {
+      // In Include mode, checked columns are INCLUDED (active), non-checked are inactive
+      activeCols = splitCols.filter((c) => selectedColIds.includes(c.id));
+      inactiveCols = splitCols.filter((c) => !selectedColIds.includes(c.id));
+    }
+
+    const perPerson =
+      activeCols.length > 0 && totalAmount > 0
+        ? (totalAmount / activeCols.length).toFixed(2)
+        : '0.00';
+
+    setEditBuffers((prev) => {
+      const tripBufs = { ...(prev[tripId] || {}) };
+      const entryBuf = { ...(tripBufs[entryId] || {}) };
+
+      activeCols.forEach((col) => {
+        entryBuf[col.id] = perPerson;
+      });
+      inactiveCols.forEach((col) => {
+        entryBuf[col.id] = '0.00';
+      });
+
+      tripBufs[entryId] = entryBuf;
+      return { ...prev, [tripId]: tripBufs };
+    });
+  };
+
   // Filter spender state
   const [spenderFilters, setSpenderFilters] = useState<Record<string, string>>({}); // tripId -> selectedSpender
   const [showFilterMenuId, setShowFilterMenuId] = useState<string | null>(null); // spender dropdown tripId
@@ -90,8 +187,6 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
   } | null>(null);
 
   const activeMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdowns on outside click
   useEffect(() => {
     if (!showAddColMenu && !showFilterMenuId) return;
     const handler = (e: MouseEvent) => {
@@ -110,6 +205,16 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
       onChangeState?.(hasUnsavedChanges, saveState);
     }
   }, [hasUnsavedChanges, isLoaded, saveState, onChangeState]);
+
+  // Auto-save changes to Supabase database so Admin and Sub-Users stay in sync
+  useEffect(() => {
+    if (isLoaded && hasUnsavedChanges) {
+      const timer = setTimeout(() => {
+        saveState();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [state, isLoaded, hasUnsavedChanges, saveState]);
 
   // Handle migration and guarantee type structure for loaded state
   const activeState = useMemo<TripExpenseState>(() => {
@@ -156,9 +261,12 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     }
   };
 
+  const [createdTripIds, setCreatedTripIds] = useState<string[]>([]);
+
   // Add Trip
   const handleAddTrip = () => {
     const newTripId = `trip_${Date.now()}`;
+    setCreatedTripIds((prev) => [...prev, newTripId]);
     const newTrip: Trip = {
       id: newTripId,
       title: 'New Trip',
@@ -186,13 +294,17 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     setConfirmDelete(null);
   };
 
+  const [collapsedTrips, setCollapsedTrips] = useState<Record<string, boolean>>({});
+
   const toggleTripExpanded = (tripId: string) => {
-    setState((prev) => ({
+    setCollapsedTrips((prev) => ({
       ...prev,
-      trips: activeState.trips.map((t) =>
-        t.id === tripId ? { ...t, expanded: !t.expanded } : t
-      )
+      [tripId]: !prev[tripId],
     }));
+  };
+
+  const isTripExpanded = (trip: Trip) => {
+    return collapsedTrips[trip.id] !== undefined ? !collapsedTrips[trip.id] : (trip.expanded !== false);
   };
 
   // Edit Trip Title
@@ -683,9 +795,12 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
       return rawTrips;
     }
     return rawTrips.filter(
-      (t) => allowedTripIds.includes(t.id) || allowedTripIds.includes(t.title)
+      (t) =>
+        allowedTripIds.includes(t.id) ||
+        allowedTripIds.includes(t.title) ||
+        createdTripIds.includes(t.id)
     );
-  }, [activeState.trips, allowedTripIds]);
+  }, [activeState.trips, allowedTripIds, createdTripIds]);
 
   return (
     <div className="space-y-6">
@@ -764,25 +879,28 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                   }`}
                 >
                   {/* Trip Card Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-4 bg-gray-50/70 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-700 gap-3 group/header">
+                  <div
+                    onClick={() => toggleTripExpanded(trip.id)}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-5 py-4 bg-gray-50/70 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-700 gap-3 group/header cursor-pointer select-none"
+                  >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div
-                        onMouseDown={() => setCanDragId(trip.id)}
-                        onMouseUp={() => setCanDragId(null)}
+                        onMouseDown={(e) => { e.stopPropagation(); setCanDragId(trip.id); }}
+                        onMouseUp={(e) => { e.stopPropagation(); setCanDragId(null); }}
                         className="opacity-0 group-hover/header:opacity-100 transition-opacity cursor-grab flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                         title="Drag to reorder"
                       >
                         <GripVertical className="w-4 h-4" />
                       </div>
                       <button
-                        onClick={() => toggleTripExpanded(trip.id)}
+                        onClick={(e) => { e.stopPropagation(); toggleTripExpanded(trip.id); }}
                         className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-500 dark:text-gray-400 transition-colors cursor-pointer"
                       >
-                        {trip.expanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                        {isTripExpanded(trip) ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
                       </button>
 
                       {editingTitleId === trip.id ? (
-                        <div className="flex items-center gap-1.5">
+                        <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5">
                           <input
                             type="text"
                             value={titleEditValue}
@@ -810,13 +928,13 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                       ) : (
                         <div className="flex items-center gap-2 group min-w-0">
                           <h3
-                            onClick={() => startEditingTitle(trip.id, trip.title)}
+                            onClick={(e) => { e.stopPropagation(); startEditingTitle(trip.id, trip.title); }}
                             className="text-base font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer truncate"
                           >
                             {trip.title}
                           </h3>
                           <button
-                            onClick={() => startEditingTitle(trip.id, trip.title)}
+                            onClick={(e) => { e.stopPropagation(); startEditingTitle(trip.id, trip.title); }}
                             className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-opacity"
                             title="Edit Trip Title"
                           >
@@ -827,8 +945,8 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                     </div>
 
                     {/* Header Controls */}
-                    {trip.expanded && (
-                      <div className="flex flex-wrap items-center gap-2">
+                    {isTripExpanded(trip) && (
+                      <div onClick={(e) => e.stopPropagation()} className="flex flex-wrap items-center gap-2">
                         {/* Exports */}
                         <div className="flex items-center border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-lg p-0.5 shadow-sm">
                           <button
@@ -905,7 +1023,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                   </div>
 
                   {/* Trip Table Content */}
-                  {trip.expanded && (
+                  {isTripExpanded(trip) && (
                     <div className="p-4">
                       {trip.entries.length === 0 ? (
                         <div className="text-center py-8 text-gray-400 dark:text-gray-500">
@@ -1126,13 +1244,214 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                             </button>
 
                                             {trip.columns.some((c) => c.type === 'split') && (
-                                              <button
-                                                onClick={() => handleSplitEqually(trip.id, entry.id)}
-                                                className="p-1 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-lg transition-colors cursor-pointer"
-                                                title="Split amount equally"
-                                              >
-                                                <Calculator className="w-3.5 h-3.5" />
-                                              </button>
+                                              <div className="relative">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    if (splitPopover?.tripId === trip.id && splitPopover?.entryId === entry.id) {
+                                                      setSplitPopover(null);
+                                                    } else {
+                                                      setSplitPopover({
+                                                        tripId: trip.id,
+                                                        entryId: entry.id,
+                                                        mode: 'all',
+                                                        selectedCols: [],
+                                                      });
+                                                      applySplitEquallyAll(trip.id, entry.id);
+                                                    }
+                                                  }}
+                                                  className="p-1 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                                  title="Split Amount Options (Equally / Exclude / Include)"
+                                                >
+                                                  <Calculator className="w-3.5 h-3.5" />
+                                                </button>
+
+                                                {/* Split Calculator Popover Menu */}
+                                                {splitPopover?.tripId === trip.id && splitPopover?.entryId === entry.id && (
+                                                  <div
+                                                    ref={splitPopoverRef}
+                                                    className="absolute right-0 top-full mt-1.5 z-40 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-3.5 w-64 text-left animate-in fade-in duration-100"
+                                                  >
+                                                    <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-2 mb-2">
+                                                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-gray-100">
+                                                        <Calculator className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                                                        <span>Split Options</span>
+                                                      </div>
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => setSplitPopover(null)}
+                                                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-0.5"
+                                                      >
+                                                        <X className="w-3.5 h-3.5" />
+                                                      </button>
+                                                    </div>
+
+                                                    {/* 3 Categories / Modes */}
+                                                    <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700/60 p-0.5 mb-3 text-[10px] font-bold">
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                          setSplitPopover((prev) => prev ? { ...prev, mode: 'all' } : null);
+                                                          applySplitEquallyAll(trip.id, entry.id);
+                                                        }}
+                                                        className={`flex-1 py-1 px-1 rounded-md transition-colors text-center ${
+                                                          splitPopover.mode === 'all'
+                                                            ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold'
+                                                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                                                        }`}
+                                                      >
+                                                        Equally
+                                                      </button>
+
+                                                      <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                          setSplitPopover((prev) => prev ? { ...prev, mode: 'exclude', selectedCols: [] } : null)
+                                                        }
+                                                        className={`flex-1 py-1 px-1 rounded-md transition-colors text-center ${
+                                                          splitPopover.mode === 'exclude'
+                                                            ? 'bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 shadow-2xs font-bold'
+                                                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                                                        }`}
+                                                      >
+                                                        Exclude
+                                                      </button>
+
+                                                      <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                          setSplitPopover((prev) => prev ? { ...prev, mode: 'include', selectedCols: [] } : null)
+                                                        }
+                                                        className={`flex-1 py-1 px-1 rounded-md transition-colors text-center ${
+                                                          splitPopover.mode === 'include'
+                                                            ? 'bg-white dark:bg-gray-800 text-emerald-600 dark:text-emerald-400 shadow-2xs font-bold'
+                                                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                                                        }`}
+                                                      >
+                                                        Include
+                                                      </button>
+                                                    </div>
+
+                                                    {/* Tab 1: Equally to All */}
+                                                    {splitPopover.mode === 'all' && (
+                                                      <div className="space-y-2">
+                                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                                                          Splits total amount equally across all split members.
+                                                        </p>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => {
+                                                            applySplitEquallyAll(trip.id, entry.id);
+                                                            setSplitPopover(null);
+                                                          }}
+                                                          className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs"
+                                                        >
+                                                          <Zap className="w-3.5 h-3.5" />
+                                                          Split Equally to All
+                                                        </button>
+                                                      </div>
+                                                    )}
+
+                                                    {/* Tab 2: Exclude Members */}
+                                                    {splitPopover.mode === 'exclude' && (
+                                                      <div className="space-y-2">
+                                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                                                          Check members to <strong className="text-red-600 dark:text-red-400">EXCLUDE</strong> ($0.00):
+                                                        </p>
+                                                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                                                          {trip.columns
+                                                            .filter((c) => c.type === 'split')
+                                                            .map((col) => {
+                                                              const isChecked = splitPopover.selectedCols.includes(col.id);
+                                                              return (
+                                                                <button
+                                                                  key={col.id}
+                                                                  type="button"
+                                                                  onClick={() => {
+                                                                    const newSelected = isChecked
+                                                                      ? splitPopover.selectedCols.filter((id) => id !== col.id)
+                                                                      : [...splitPopover.selectedCols, col.id];
+                                                                    setSplitPopover((prev) => prev ? { ...prev, selectedCols: newSelected } : null);
+                                                                    applyCustomSplit(trip.id, entry.id, 'exclude', newSelected);
+                                                                  }}
+                                                                  className={`w-full flex items-center justify-between p-1.5 rounded-lg border text-xs transition-colors ${
+                                                                    isChecked
+                                                                      ? 'border-red-300 bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 font-bold'
+                                                                      : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
+                                                                  }`}
+                                                                >
+                                                                  <span className="truncate">{col.name}</span>
+                                                                  {isChecked ? (
+                                                                    <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.2 rounded font-bold">Excluded</span>
+                                                                  ) : (
+                                                                    <span className="text-[9px] text-gray-400 font-normal">Included</span>
+                                                                  )}
+                                                                </button>
+                                                              );
+                                                            })}
+                                                        </div>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => setSplitPopover(null)}
+                                                          className="w-full mt-1 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs"
+                                                        >
+                                                          <UserX className="w-3.5 h-3.5" />
+                                                          Done Exclude Split
+                                                        </button>
+                                                      </div>
+                                                    )}
+
+                                                    {/* Tab 3: Include Only Members */}
+                                                    {splitPopover.mode === 'include' && (
+                                                      <div className="space-y-2">
+                                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                                                          Check members to <strong className="text-emerald-600 dark:text-emerald-400">INCLUDE ONLY</strong>:
+                                                        </p>
+                                                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                                                          {trip.columns
+                                                            .filter((c) => c.type === 'split')
+                                                            .map((col) => {
+                                                              const isChecked = splitPopover.selectedCols.includes(col.id);
+                                                              return (
+                                                                <button
+                                                                  key={col.id}
+                                                                  type="button"
+                                                                  onClick={() => {
+                                                                    const newSelected = isChecked
+                                                                      ? splitPopover.selectedCols.filter((id) => id !== col.id)
+                                                                      : [...splitPopover.selectedCols, col.id];
+                                                                    setSplitPopover((prev) => prev ? { ...prev, selectedCols: newSelected } : null);
+                                                                    applyCustomSplit(trip.id, entry.id, 'include', newSelected);
+                                                                  }}
+                                                                  className={`w-full flex items-center justify-between p-1.5 rounded-lg border text-xs transition-colors ${
+                                                                    isChecked
+                                                                      ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold'
+                                                                      : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
+                                                                  }`}
+                                                                >
+                                                                  <span className="truncate">{col.name}</span>
+                                                                  {isChecked ? (
+                                                                    <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.2 rounded font-bold">Included</span>
+                                                                  ) : (
+                                                                    <span className="text-[9px] text-gray-400 font-normal">Excluded</span>
+                                                                  )}
+                                                                </button>
+                                                              );
+                                                            })}
+                                                        </div>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => setSplitPopover(null)}
+                                                          className="w-full mt-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs"
+                                                        >
+                                                          <UserCheck className="w-3.5 h-3.5" />
+                                                          Done Include Split
+                                                        </button>
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                )}
+                                              </div>
                                             )}
 
                                             <button

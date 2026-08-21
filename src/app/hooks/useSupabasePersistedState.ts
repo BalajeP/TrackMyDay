@@ -18,6 +18,7 @@ export function useSupabasePersistedState<T>(
   const valueRef = useRef<T>(value);
   const loggedOutDefaultRef = useRef(loggedOutDefault);
   const loggedInDefaultRef = useRef(loggedInDefault);
+  const targetUserIdRef = useRef<string | null>(null);
 
   // All useEffect calls third
 
@@ -30,6 +31,7 @@ export function useSupabasePersistedState<T>(
   useEffect(() => {
     if (!accessToken) {
       setUserId(null);
+      targetUserIdRef.current = null;
       return;
     }
 
@@ -41,6 +43,7 @@ export function useSupabasePersistedState<T>(
     } catch (err) {
       console.error(`[${key}] Failed to decode token:`, err);
       setUserId(null);
+      targetUserIdRef.current = null;
     }
   }, [accessToken, key]);
 
@@ -58,29 +61,45 @@ export function useSupabasePersistedState<T>(
     console.log(`[${key}] Loading from Supabase database...`);
     setIsLoaded(false);
 
-    // Load from Supabase database
+    // 1. Query for exact user_id match
     supabase
       .from('user_data')
-      .select('data_value')
+      .select('user_id, data_value')
       .eq('user_id', userId)
       .eq('data_key', key)
       .maybeSingle()
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error) {
           console.error(`[${key}] Error loading from Supabase:`, error);
-          const fallback = loggedInDefaultRef.current;
-          lastSavedRef.current = JSON.stringify(fallback);
-          setValue(fallback);
-          setIsLoaded(true);
-          return;
         }
 
         if (data && data.data_value) {
+          targetUserIdRef.current = data.user_id;
           const loadedData = data.data_value as T;
           lastSavedRef.current = JSON.stringify(loadedData);
           setValue(loadedData);
-          console.log(`✓ [${key}] Loaded from Supabase database`);
+          console.log(`✓ [${key}] Loaded exact user record from Supabase database`);
+          setIsLoaded(true);
+          setHasUnsavedChanges(false);
+          return;
+        }
+
+        // 2. Fallback for sub-users: query shared user_data record for this data_key
+        const { data: sharedList, error: sharedErr } = await supabase
+          .from('user_data')
+          .select('user_id, data_value')
+          .eq('data_key', key)
+          .order('updated_at', { ascending: false })
+          .limit(1);
+
+        if (!sharedErr && sharedList && sharedList.length > 0 && sharedList[0].data_value) {
+          targetUserIdRef.current = sharedList[0].user_id;
+          const loadedData = sharedList[0].data_value as T;
+          lastSavedRef.current = JSON.stringify(loadedData);
+          setValue(loadedData);
+          console.log(`✓ [${key}] Loaded shared data record (owned by ${sharedList[0].user_id})`);
         } else {
+          targetUserIdRef.current = userId;
           const defaultData = loggedInDefaultRef.current;
           lastSavedRef.current = JSON.stringify(defaultData);
           setValue(defaultData);
@@ -100,8 +119,9 @@ export function useSupabasePersistedState<T>(
 
   // Manual save function - saves to Supabase database
   const save = useCallback(async () => {
-    if (!accessToken || !userId) {
-      console.warn(`✗ [${key}] Cannot save: ${!accessToken ? 'no access token' : 'no user ID'}`);
+    const saveUserId = targetUserIdRef.current || userId;
+    if (!accessToken || !saveUserId) {
+      console.warn(`✗ [${key}] Cannot save: ${!accessToken ? 'no access token' : 'no target user ID'}`);
       return;
     }
 
@@ -109,13 +129,13 @@ export function useSupabasePersistedState<T>(
       const currentValue = valueRef.current;
       const serialized = JSON.stringify(currentValue);
 
-      console.log(`[${key}] Saving to Supabase database...`);
+      console.log(`[${key}] Saving to Supabase database for user ${saveUserId}...`);
 
       // Upsert to Supabase database
       const { error } = await supabase
         .from('user_data')
         .upsert({
-          user_id: userId,
+          user_id: saveUserId,
           data_key: key,
           data_value: currentValue,
         }, {
@@ -135,7 +155,7 @@ export function useSupabasePersistedState<T>(
       const { data: verification } = await supabase
         .from('user_data')
         .select('data_value')
-        .eq('user_id', userId)
+        .eq('user_id', saveUserId)
         .eq('data_key', key)
         .maybeSingle();
 

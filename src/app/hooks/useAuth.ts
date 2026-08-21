@@ -437,6 +437,9 @@ export function useAuth() {
     const { data, error } = await supabase.from('app_users').select('*').order('created_at', { ascending: false });
     if (error) {
       console.error('Failed to fetch app users:', error);
+      if (error.message?.includes('schema cache') || error.message?.includes('app_users') || error.code === '42P01') {
+        setError("Database table 'app_users' does not exist in Supabase yet. Please run the SQL migration in Supabase SQL Editor.");
+      }
       return [];
     }
     return data || [];
@@ -446,6 +449,12 @@ export function useAuth() {
     const { data, error } = await supabase.from('app_users').insert([newUser]).select().single();
     if (error) {
       console.error('Failed to create app user:', error);
+      if (error.message?.includes('schema cache') || error.message?.includes('app_users') || error.code === '42P01') {
+        return {
+          success: false,
+          error: "Database table 'app_users' does not exist in Supabase yet. Please run the SQL migration query in Supabase Dashboard SQL Editor.",
+        };
+      }
       return { success: false, error: error.message };
     }
     return { success: true };
@@ -455,6 +464,12 @@ export function useAuth() {
     const { error } = await supabase.from('app_users').update(updates).eq('id', id);
     if (error) {
       console.error('Failed to update app user:', error);
+      if (error.message?.includes('schema cache') || error.message?.includes('app_users') || error.code === '42P01') {
+        return {
+          success: false,
+          error: "Database table 'app_users' does not exist in Supabase yet. Please run the SQL migration query in Supabase Dashboard SQL Editor.",
+        };
+      }
       return { success: false, error: error.message };
     }
     return { success: true };
@@ -464,6 +479,12 @@ export function useAuth() {
     const { error } = await supabase.from('app_users').delete().eq('id', id);
     if (error) {
       console.error('Failed to delete app user:', error);
+      if (error.message?.includes('schema cache') || error.message?.includes('app_users') || error.code === '42P01') {
+        return {
+          success: false,
+          error: "Database table 'app_users' does not exist in Supabase yet. Please run the SQL migration query in Supabase Dashboard SQL Editor.",
+        };
+      }
       return { success: false, error: error.message };
     }
     return { success: true };

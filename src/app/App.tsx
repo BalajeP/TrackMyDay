@@ -27,6 +27,7 @@ import {
   AlertCircle,
   Check,
   Eye,
+  EyeOff,
   Lock,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -163,6 +164,7 @@ function SettingsModal({
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [accessLevel, setAccessLevel] = useState<'edit' | 'view_only'>('edit');
   const [allowedComponents, setAllowedComponents] = useState<string[]>(['expenses']);
   const [allowedTripIds, setAllowedTripIds] = useState<string[]>(['*']);
@@ -190,11 +192,24 @@ function SettingsModal({
       const { data } = await supabase
         .from('user_data')
         .select('data_value')
-        .eq('data_key', 'trip_expenses')
-        .maybeSingle();
+        .eq('data_key', 'trip_expenses');
 
-      if (data && data.data_value && Array.isArray(data.data_value.trips)) {
-        setAvailableTrips(data.data_value.trips.map((t: any) => ({ id: t.id, title: t.title || 'Untitled Trip' })));
+      if (data && data.length > 0) {
+        const allTrips: { id: string; title: string }[] = [];
+        data.forEach((row: any) => {
+          if (row.data_value && Array.isArray(row.data_value.trips)) {
+            row.data_value.trips.forEach((t: any) => {
+              if (t && (t.id || t.title)) {
+                const tripId = t.id || t.title;
+                const tripTitle = t.title || 'Untitled Trip';
+                if (!allTrips.some((existing) => existing.id === tripId || existing.title === tripTitle)) {
+                  allTrips.push({ id: tripId, title: tripTitle });
+                }
+              }
+            });
+          }
+        });
+        setAvailableTrips(allTrips);
       }
     } catch (err) {
       console.error('Failed to load trips for user management:', err);
@@ -213,6 +228,7 @@ function SettingsModal({
     setEmail('');
     setName('');
     setPassword('');
+    setShowPassword(false);
     setAccessLevel('edit');
     setAllowedComponents(['expenses']);
     setAllowedTripIds(['*']);
@@ -516,15 +532,29 @@ function SettingsModal({
                     </div>
                     <div>
                       <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Password</label>
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
-                        required
-                        minLength={4}
-                        className="w-full px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          required
+                          minLength={4}
+                          className="w-full pl-2.5 pr-8 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5"
+                          title={showPassword ? 'Hide password' : 'Show password'}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          ) : (
+                            <Eye className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
 

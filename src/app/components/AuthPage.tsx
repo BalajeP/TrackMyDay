@@ -13,8 +13,8 @@ interface Props {
 export default function AuthPage({ onLogin, onSignup, onResetPassword, error, clearError }: Props) {
   const { isInstallable, promptInstall } = usePWA();
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot_password'>('login');
-  const [email, setEmail] = useState('slbbalaje@gmail.com');
-  const [password, setPassword] = useState('Bala@1503');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
