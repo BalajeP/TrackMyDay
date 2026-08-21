@@ -1071,6 +1071,7 @@ export default function App() {
     lang,
     isReadOnly,
     allowedTripIds,
+    isMainAdmin: userProfile?.isMainAdmin ?? true,
   };
 
   if (authLoading) {

@@ -59,6 +59,7 @@ interface Props {
   accessToken: string | null;
   allowedTripIds?: string[];
   isReadOnly?: boolean;
+  isMainAdmin?: boolean;
   onUnsavedChanges?: (hasChanges: boolean, save: () => void) => void;
 }
 
@@ -149,9 +150,18 @@ export default function Expenditure({
   accessToken,
   allowedTripIds,
   isReadOnly,
+  isMainAdmin = true,
   onUnsavedChanges,
 }: Props) {
-  const [expenseTab, setExpenseTab] = useState<ExpenseTab>('daily');
+  const [expenseTab, setExpenseTab] = useState<ExpenseTab>(() => {
+    return isMainAdmin === false ? 'trip' : 'daily';
+  });
+
+  useEffect(() => {
+    if (isMainAdmin === false) {
+      setExpenseTab('trip');
+    }
+  }, [isMainAdmin]);
   
   // Outer Confirmation Dialog State (for outside actions)
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -837,21 +847,23 @@ export default function Expenditure({
       {/* Top Sub-Tab Switcher Component */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 pb-4">
         <div className="flex items-center p-1 bg-gray-100/80 dark:bg-gray-800 rounded-xl border border-gray-200/60 dark:border-gray-700">
-          <button
-            onClick={() => setExpenseTab('daily')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              expenseTab === 'daily'
-                ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-            }`}
-          >
-            <Receipt className="w-4 h-4" />
-            <span>Daily Expenses</span>
-          </button>
+          {isMainAdmin !== false && (
+            <button
+              onClick={() => setExpenseTab('daily')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                expenseTab === 'daily'
+                  ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+              }`}
+            >
+              <Receipt className="w-4 h-4" />
+              <span>Daily Expenses</span>
+            </button>
+          )}
           <button
             onClick={() => setExpenseTab('trip')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              expenseTab === 'trip'
+              expenseTab === 'trip' || isMainAdmin === false
                 ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
                 : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
             }`}
@@ -879,7 +891,7 @@ export default function Expenditure({
       </div>
 
       {/* Daily Expenses View */}
-      <div className={expenseTab === 'daily' ? 'space-y-6' : 'hidden'}>
+      <div className={expenseTab === 'daily' && isMainAdmin !== false ? 'space-y-6' : 'hidden'}>
         {/* Date & Time Navigation Bar (Today, Weekly, Monthly, Yearly) */}
         <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-gray-700 pb-3">
