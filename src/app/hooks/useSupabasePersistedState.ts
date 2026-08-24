@@ -13,6 +13,9 @@ export function useSupabasePersistedState<T>(
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
+  const [isSubUser, setIsSubUser] = useState(false);
+  const [adminId, setAdminId] = useState<string | null>(null);
+
   // All useRef calls second
   const lastSavedRef = useRef<string>('');
   const valueRef = useRef<T>(value);
@@ -27,10 +30,12 @@ export function useSupabasePersistedState<T>(
     valueRef.current = value;
   }, [value]);
 
-  // 2. Extract user ID from access token
+  // 2. Extract user ID & sub-user status from access token
   useEffect(() => {
     if (!accessToken) {
       setUserId(null);
+      setIsSubUser(false);
+      setAdminId(null);
       targetUserIdRef.current = null;
       return;
     }
@@ -38,16 +43,22 @@ export function useSupabasePersistedState<T>(
     try {
       const payload = JSON.parse(atob(accessToken.split('.')[1]));
       const extractedUserId = payload.sub || null;
-      console.log(`[${key}] Extracted userId from token:`, extractedUserId);
+      const subUserFlag = payload.role === 'subadmin' || payload.isMainAdmin === false;
+      const extractedAdminId = payload.adminId || null;
+      console.log(`[${key}] Extracted userId from token:`, extractedUserId, 'isSubUser:', subUserFlag, 'adminId:', extractedAdminId);
       setUserId(extractedUserId);
+      setIsSubUser(subUserFlag);
+      setAdminId(extractedAdminId);
     } catch (err) {
       console.error(`[${key}] Failed to decode token:`, err);
       setUserId(null);
+      setIsSubUser(false);
+      setAdminId(null);
       targetUserIdRef.current = null;
     }
   }, [accessToken, key]);
 
-  // 3. Load data from Supabase when userId changes
+  // 3. Load data from Supabase when userId, isSubUser or adminId changes
   useEffect(() => {
     if (!accessToken || !userId) {
       console.log(`[${key}] No auth, using default`);
@@ -58,7 +69,7 @@ export function useSupabasePersistedState<T>(
       return;
     }
 
-    console.log(`[${key}] Loading from Supabase database...`);
+    console.log(`[${key}] Loading from Supabase database... (isSubUser: ${isSubUser}, adminId: ${adminId})`);
     setIsLoaded(false);
 
     // 1. Query for exact user_id match
@@ -78,37 +89,49 @@ export function useSupabasePersistedState<T>(
           const loadedData = data.data_value as T;
           lastSavedRef.current = JSON.stringify(loadedData);
           setValue(loadedData);
-          console.log(`✓ [${key}] Loaded exact user record from Supabase database`);
+          console.log(`✓ [${key}] Loaded user record from Supabase database (user: ${userId})`);
           setIsLoaded(true);
           setHasUnsavedChanges(false);
           return;
         }
 
-        // 2. Fallback for sub-users: query shared user_data record for this data_key
-        const { data: sharedList, error: sharedErr } = await supabase
-          .from('user_data')
-          .select('user_id, data_value')
-          .eq('data_key', key)
-          .order('updated_at', { ascending: false })
-          .limit(1);
+        // 2. If sub-admin user has no custom record yet, load shared dataset created by their owning Main Admin
+        if (isSubUser) {
+          let sharedQuery = supabase
+            .from('user_data')
+            .select('user_id, data_value')
+            .eq('data_key', key);
 
-        if (!sharedErr && sharedList && sharedList.length > 0 && sharedList[0].data_value) {
-          targetUserIdRef.current = sharedList[0].user_id;
-          const loadedData = sharedList[0].data_value as T;
-          lastSavedRef.current = JSON.stringify(loadedData);
-          setValue(loadedData);
-          console.log(`✓ [${key}] Loaded shared data record (owned by ${sharedList[0].user_id})`);
-        } else {
-          targetUserIdRef.current = userId;
-          const defaultData = loggedInDefaultRef.current;
-          lastSavedRef.current = JSON.stringify(defaultData);
-          setValue(defaultData);
-          console.log(`✓ [${key}] No saved data in database, using default`);
+          if (adminId) {
+            sharedQuery = sharedQuery.eq('user_id', adminId);
+          } else {
+            sharedQuery = sharedQuery.order('updated_at', { ascending: false }).limit(1);
+          }
+
+          const { data: sharedList, error: sharedErr } = await sharedQuery;
+
+          if (!sharedErr && sharedList && sharedList.length > 0 && sharedList[0].data_value) {
+            targetUserIdRef.current = sharedList[0].user_id;
+            const loadedData = sharedList[0].data_value as T;
+            lastSavedRef.current = JSON.stringify(loadedData);
+            setValue(loadedData);
+            console.log(`✓ [${key}] Sub-user loaded shared dataset (owned by ${sharedList[0].user_id})`);
+            setIsLoaded(true);
+            setHasUnsavedChanges(false);
+            return;
+          }
         }
+
+        // 3. Standalone main user or no shared record — start fresh with defaults
+        targetUserIdRef.current = userId;
+        const defaultData = loggedInDefaultRef.current;
+        lastSavedRef.current = JSON.stringify(defaultData);
+        setValue(defaultData);
+        console.log(`✓ [${key}] No saved data found for user ${userId}, using default`);
         setIsLoaded(true);
         setHasUnsavedChanges(false);
       });
-  }, [accessToken, key, userId]);
+  }, [accessToken, key, userId, isSubUser, adminId]);
 
   // 4. Track unsaved changes
   useEffect(() => {

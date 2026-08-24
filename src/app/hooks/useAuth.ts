@@ -1,33 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../../lib/supabaseClient';
+import { subAdminService, AppUserProfile, AppUserRecord } from '../services/subAdminService';
+import { mainAuthService } from '../services/mainAuthService';
 
-export interface AppUserProfile {
-  id: string;
-  email: string;
-  username: string;
-  name: string;
-  role: 'admin' | 'subadmin' | 'user';
-  accessLevel: 'edit' | 'view_only';
-  allowedComponents: string[];
-  allowedTripIds: string[];
-  isMainAdmin: boolean;
-  activeSessionsCount?: number;
-}
-
-export interface AppUserRecord {
-  id: string;
-  username: string;
-  email: string;
-  password?: string;
-  name: string;
-  role: 'admin' | 'subadmin' | 'user';
-  access_level?: 'edit' | 'view_only';
-  allowed_components: string[];
-  allowed_trip_ids?: string[];
-  created_at?: string;
-  updated_at?: string;
-}
+export type { AppUserProfile, AppUserRecord };
 
 const ALL_COMPONENTS = ['activities', 'tracking', 'meals', 'workout', 'expenses', 'calendar'];
 const MAIN_ADMIN_EMAILS = ['slbbalaje@gmail.com', 'slbbalaji@gmail.com'];
@@ -117,10 +94,10 @@ async function unregisterUserSession(accountIdentifier?: string) {
   }
 }
 
-// Generate a synthetic JWT token string for sub-users so useSupabasePersistedState can extract userId
+// Generate a synthetic JWT token string for sub-users so useSupabasePersistedState can extract userId & adminId
 function createSubUserToken(user: AppUserProfile): string {
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-  const payload = btoa(JSON.stringify({ sub: user.id, email: user.email, role: user.role }));
+  const payload = btoa(JSON.stringify({ sub: user.id, adminId: user.adminId, email: user.email, role: user.role, isMainAdmin: user.isMainAdmin }));
   const sig = btoa('subuser_signature');
   return `${header}.${payload}.${sig}`;
 }
@@ -131,24 +108,9 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Helper to construct AppUserProfile for Admin
-  const createAdminProfile = (email: string, id: string, name?: string, activeSessionsCount?: number): AppUserProfile => ({
-    id,
-    email,
-    username: email.split('@')[0],
-    name: name || 'Admin',
-    role: 'admin',
-    accessLevel: 'edit',
-    allowedComponents: ALL_COMPONENTS,
-    allowedTripIds: ['*'],
-    isMainAdmin: true,
-    activeSessionsCount,
-  });
-
   // Session Heartbeat effect while logged in
   useEffect(() => {
     if (!userProfile) return;
-    const accountId = userProfile.email || userProfile.username;
 
     const interval = setInterval(async () => {
       const deviceId = getDeviceSessionId();
@@ -178,6 +140,7 @@ export function useAuth() {
           if (dbUser && !fetchErr) {
             const activeProfile: AppUserProfile = {
               id: dbUser.id,
+              adminId: dbUser.admin_id || undefined,
               email: dbUser.email,
               username: dbUser.username,
               name: dbUser.name,
@@ -211,7 +174,7 @@ export function useAuth() {
         if (currentSession?.user) {
           setSession(currentSession);
           const email = currentSession.user.email || '';
-          const profile = createAdminProfile(email, currentSession.user.id, currentSession.user.user_metadata?.name);
+          const profile = mainAuthService.createAdminProfile(email, currentSession.user.id, currentSession.user.user_metadata?.name);
           if (isMounted) {
             setUserProfile(profile);
           }
@@ -231,7 +194,7 @@ export function useAuth() {
       if (!storedSubUser && newSession?.user) {
         setSession(newSession);
         const email = newSession.user.email || '';
-        setUserProfile(createAdminProfile(email, newSession.user.id, newSession.user.user_metadata?.name));
+        setUserProfile(mainAuthService.createAdminProfile(email, newSession.user.id, newSession.user.user_metadata?.name));
       } else if (!storedSubUser && !newSession) {
         setSession(null);
         setUserProfile(null);
@@ -251,7 +214,7 @@ export function useAuth() {
     const checkInterval = setInterval(async () => {
       const { data, error } = await supabase
         .from('app_users')
-        .select('id, allowed_components, access_level, allowed_trip_ids')
+        .select('id, admin_id, allowed_components, access_level, allowed_trip_ids')
         .eq('id', userProfile.id)
         .maybeSingle();
 
@@ -285,7 +248,7 @@ export function useAuth() {
     return () => clearInterval(checkInterval);
   }, [userProfile]);
 
-  // Login handler: accepts email or username + password, enforcing MAX 5 concurrent users per account
+  // Login handler: accepts email or username + password
   const login = async (identifier: string, password: string): Promise<boolean> => {
     setError(null);
     const cleanIdentifier = identifier.trim().toLowerCase();
@@ -298,66 +261,26 @@ export function useAuth() {
         return false;
       }
 
-      // Step A: Check app_users table for sub-admins / trip users
-      const { data: dbUsers, error: dbErr } = await supabase
-        .from('app_users')
-        .select('*')
-        .or(`email.ilike.${cleanIdentifier},username.ilike.${cleanIdentifier}`);
-
-      if (dbUsers && dbUsers.length > 0 && !dbErr) {
-        const foundUser: AppUserRecord = dbUsers[0];
-        if (foundUser.password !== password) {
-          setError('Invalid username/email or password.');
-          return false;
-        }
-
-        const profile: AppUserProfile = {
-          id: foundUser.id,
-          email: foundUser.email,
-          username: foundUser.username,
-          name: foundUser.name,
-          role: foundUser.role || 'subadmin',
-          accessLevel: (foundUser.access_level as 'edit' | 'view_only') || 'edit',
-          allowedComponents: Array.isArray(foundUser.allowed_components) && foundUser.allowed_components.length > 0
-            ? foundUser.allowed_components
-            : ['expenses'],
-          allowedTripIds: Array.isArray(foundUser.allowed_trip_ids) && foundUser.allowed_trip_ids.length > 0
-            ? foundUser.allowed_trip_ids
-            : ['*'],
-          isMainAdmin: false,
-          activeSessionsCount: sessionRes.activeCount,
-        };
-
-        localStorage.setItem('tmd_sub_user_session', JSON.stringify(profile));
-        setUserProfile(profile);
+      // Step A: Check subAdminService for sub-admins / trip users
+      const subUser = await subAdminService.loginSubAdmin(cleanIdentifier, password);
+      if (subUser) {
+        subUser.activeSessionsCount = sessionRes.activeCount;
+        localStorage.setItem('tmd_sub_user_session', JSON.stringify(subUser));
+        setUserProfile(subUser);
         return true;
       }
 
-      // Step B: Attempt Supabase Auth (Admin)
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: cleanIdentifier,
-        password,
-      });
-
-      if (authError) {
-        setError(authError.message);
-        return false;
-      }
-
-      if (authData.user) {
+      // Step B: Attempt Main Account Supabase Auth
+      const mainRes = await mainAuthService.signIn(cleanIdentifier, password);
+      if (mainRes.success && mainRes.profile && mainRes.session) {
         localStorage.removeItem('tmd_sub_user_session');
-        setSession(authData.session);
-        const profile = createAdminProfile(
-          authData.user.email || cleanIdentifier,
-          authData.user.id,
-          authData.user.user_metadata?.name,
-          sessionRes.activeCount
-        );
-        setUserProfile(profile);
+        setSession(mainRes.session);
+        mainRes.profile.activeSessionsCount = sessionRes.activeCount;
+        setUserProfile(mainRes.profile);
         return true;
       }
 
-      setError('Invalid username/email or password.');
+      setError(mainRes.error || 'Invalid username/email or password.');
       return false;
     } catch (err) {
       setError(`Login failed: ${err}`);
@@ -365,38 +288,21 @@ export function useAuth() {
     }
   };
 
+  // Main Account Creation (Sign Up via Supabase Auth)
   const signup = async (email: string, password: string, name: string): Promise<boolean> => {
     setError(null);
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { name: name || '' },
-        },
-      });
-
-      if (error) {
-        setError(error.message);
-        return false;
-      }
-
-      if (data.user && !data.session) {
-        setError('Please check your email to confirm your account.');
-        return false;
-      }
-
-      if (data.user && data.session) {
-        localStorage.removeItem('tmd_sub_user_session');
-        setSession(data.session);
-        setUserProfile(createAdminProfile(data.user.email || email, data.user.id, name));
-      }
-
-      return true;
-    } catch (err) {
-      setError(`Signup failed: ${err}`);
+    const res = await mainAuthService.signUp(email, password, name);
+    if (!res.success) {
+      setError(res.error || 'Signup failed.');
       return false;
     }
+
+    if (res.profile && res.session) {
+      localStorage.removeItem('tmd_sub_user_session');
+      setSession(res.session);
+      setUserProfile(res.profile);
+    }
+    return true;
   };
 
   const logout = async () => {
@@ -404,7 +310,7 @@ export function useAuth() {
     localStorage.removeItem('tmd_sub_user_session');
     setUserProfile(null);
     setSession(null);
-    await supabase.auth.signOut();
+    await mainAuthService.signOut();
   };
 
   const resetPassword = async (email: string, newPassword: string): Promise<boolean> => {
@@ -432,68 +338,57 @@ export function useAuth() {
     }
   };
 
-  // ── Admin Sub-User Management Functions ──────────────────────────────────
+  // ── Admin Sub-User Management Functions (scoped to logged-in Main Admin ID) ──────────────────────
   const fetchAppUsers = useCallback(async (): Promise<AppUserRecord[]> => {
-    const { data, error } = await supabase.from('app_users').select('*').order('created_at', { ascending: false });
-    if (error) {
-      console.error('Failed to fetch app users:', error);
-      if (error.message?.includes('schema cache') || error.message?.includes('app_users') || error.code === '42P01') {
-        setError("Database table 'app_users' does not exist in Supabase yet. Please run the SQL migration in Supabase SQL Editor.");
-      }
-      return [];
-    }
-    return data || [];
-  }, []);
+    if (!userProfile?.id || !userProfile.isMainAdmin) return [];
+    return subAdminService.fetchSubAdmins(userProfile.id);
+  }, [userProfile]);
 
   const createAppUser = useCallback(async (newUser: Omit<AppUserRecord, 'id'>): Promise<{ success: boolean; error?: string }> => {
-    const { data, error } = await supabase.from('app_users').insert([newUser]).select().single();
-    if (error) {
-      console.error('Failed to create app user:', error);
-      if (error.message?.includes('schema cache') || error.message?.includes('app_users') || error.code === '42P01') {
-        return {
-          success: false,
-          error: "Database table 'app_users' does not exist in Supabase yet. Please run the SQL migration query in Supabase Dashboard SQL Editor.",
-        };
-      }
-      return { success: false, error: error.message };
+    if (!userProfile?.id || !userProfile.isMainAdmin) {
+      return { success: false, error: 'Only Main Admin accounts can create sub-users.' };
     }
-    return { success: true };
-  }, []);
+    return subAdminService.createSubAdmin(userProfile.id, newUser);
+  }, [userProfile]);
 
   const updateAppUser = useCallback(async (id: string, updates: Partial<AppUserRecord>): Promise<{ success: boolean; error?: string }> => {
-    const { error } = await supabase.from('app_users').update(updates).eq('id', id);
-    if (error) {
-      console.error('Failed to update app user:', error);
-      if (error.message?.includes('schema cache') || error.message?.includes('app_users') || error.code === '42P01') {
-        return {
-          success: false,
-          error: "Database table 'app_users' does not exist in Supabase yet. Please run the SQL migration query in Supabase Dashboard SQL Editor.",
-        };
-      }
-      return { success: false, error: error.message };
+    if (!userProfile?.id || !userProfile.isMainAdmin) {
+      return { success: false, error: 'Only Main Admin accounts can update sub-users.' };
     }
-    return { success: true };
-  }, []);
+    return subAdminService.updateSubAdmin(userProfile.id, id, updates);
+  }, [userProfile]);
 
   const deleteAppUser = useCallback(async (id: string): Promise<{ success: boolean; error?: string }> => {
-    const { error } = await supabase.from('app_users').delete().eq('id', id);
-    if (error) {
-      console.error('Failed to delete app user:', error);
-      if (error.message?.includes('schema cache') || error.message?.includes('app_users') || error.code === '42P01') {
-        return {
-          success: false,
-          error: "Database table 'app_users' does not exist in Supabase yet. Please run the SQL migration query in Supabase Dashboard SQL Editor.",
-        };
-      }
-      return { success: false, error: error.message };
+    if (!userProfile?.id || !userProfile.isMainAdmin) {
+      return { success: false, error: 'Only Main Admin accounts can delete sub-users.' };
     }
-    return { success: true };
-  }, []);
+    return subAdminService.deleteSubAdmin(userProfile.id, id);
+  }, [userProfile]);
 
   // Compute active access token
   const accessToken = userProfile
     ? session?.access_token || createSubUserToken(userProfile)
     : null;
+
+  const changePassword = async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    if (!userProfile) return { success: false, error: 'No user logged in.' };
+    try {
+      if (userProfile.isMainAdmin) {
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) return { success: false, error: error.message };
+        return { success: true };
+      } else {
+        const { error } = await supabase
+          .from('app_users')
+          .update({ password: newPassword })
+          .eq('id', userProfile.id);
+        if (error) return { success: false, error: error.message };
+        return { success: true };
+      }
+    } catch (err) {
+      return { success: false, error: String(err) };
+    }
+  };
 
   return {
     session,
@@ -505,6 +400,7 @@ export function useAuth() {
     signup,
     logout,
     resetPassword,
+    changePassword,
     clearError: () => setError(null),
     fetchAppUsers,
     createAppUser,
@@ -512,3 +408,4 @@ export function useAuth() {
     deleteAppUser,
   };
 }
+

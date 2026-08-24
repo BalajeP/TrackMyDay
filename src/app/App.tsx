@@ -29,6 +29,8 @@ import {
   Eye,
   EyeOff,
   Lock,
+  User,
+  KeyRound,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import DailyActivities from './components/DailyActivities';
@@ -123,13 +125,18 @@ function Avatar({ profile, size = 'md' }: { profile: PartnerProfile; size?: 'sm'
   );
 }
 
-// ── Settings Modal with User Management & Trip Control for Main Admin ──────────
+// ── Settings Modal with 2-Column Sidebar Section Layout ────────────────────────
 function SettingsModal({
   theme,
   onThemeChange,
   lang,
   onLangChange,
   userProfile,
+  partner1,
+  onUpdateProfileName,
+  onOpenAvatarPicker,
+  changePassword,
+  logout,
   fetchAppUsers,
   createAppUser,
   updateAppUser,
@@ -141,6 +148,11 @@ function SettingsModal({
   lang: Language;
   onLangChange: (l: Language) => void;
   userProfile: AppUserProfile | null;
+  partner1: PartnerProfile;
+  onUpdateProfileName: (newName: string) => void;
+  onOpenAvatarPicker: () => void;
+  changePassword: (newPassword: string) => Promise<{ success: boolean; error?: string }>;
+  logout: () => Promise<void>;
   fetchAppUsers: () => Promise<AppUserRecord[]>;
   createAppUser: (newUser: Omit<AppUserRecord, 'id'>) => Promise<{ success: boolean; error?: string }>;
   updateAppUser: (id: string, updates: Partial<AppUserRecord>) => Promise<{ success: boolean; error?: string }>;
@@ -148,7 +160,19 @@ function SettingsModal({
   onClose: () => void;
 }) {
   const isMainAdmin = userProfile?.isMainAdmin || false;
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'general' | 'users'>('general');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'account' | 'theme' | 'language' | 'password' | 'users'>('account');
+
+  // Account Info edit state
+  const [profileNameInput, setProfileNameInput] = useState(partner1.name || userProfile?.name || '');
+  const [profileNameSaved, setProfileNameSaved] = useState(false);
+
+  // Change Password state
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [showPassModal, setShowPassModal] = useState(false);
+  const [passError, setPassError] = useState<string | null>(null);
+  const [passSuccess, setPassSuccess] = useState<string | null>(null);
+  const [changingPass, setChangingPass] = useState(false);
 
   // User Management State
   const [usersList, setUsersList] = useState<AppUserRecord[]>([]);
@@ -187,11 +211,12 @@ function SettingsModal({
   }, [isMainAdmin, fetchAppUsers]);
 
   const loadTrips = useCallback(async () => {
-    if (!isMainAdmin) return;
+    if (!isMainAdmin || !userProfile?.id) return;
     try {
       const { data } = await supabase
         .from('user_data')
         .select('data_value')
+        .eq('user_id', userProfile.id)
         .eq('data_key', 'trip_expenses');
 
       if (data && data.length > 0) {
@@ -210,11 +235,14 @@ function SettingsModal({
           }
         });
         setAvailableTrips(allTrips);
+      } else {
+        setAvailableTrips([]);
       }
     } catch (err) {
       console.error('Failed to load trips for user management:', err);
+      setAvailableTrips([]);
     }
-  }, [isMainAdmin]);
+  }, [isMainAdmin, userProfile]);
 
   useEffect(() => {
     if (activeSettingsTab === 'users') {
@@ -330,501 +358,727 @@ function SettingsModal({
     setFormSuccess(null);
   };
 
-  const handleDeleteUser = async (user: AppUserRecord) => {
-    if (!window.confirm(`Are you sure you want to remove user "${user.name}" (${user.username})? They will no longer be allowed to log in.`)) {
-      return;
-    }
-    const res = await deleteAppUser(user.id);
-    if (res.success) {
-      loadUsers();
-    } else {
-      alert(`Error deleting user: ${res.error}`);
+  const handleSaveProfileName = () => {
+    if (profileNameInput.trim()) {
+      onUpdateProfileName(profileNameInput.trim());
+      setProfileNameSaved(true);
+      setTimeout(() => setProfileNameSaved(false), 2000);
     }
   };
 
+  const handleRequestPasswordChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPassError(null);
+    setPassSuccess(null);
+    if (!newPass || newPass.length < 4) {
+      setPassError('Password must be at least 4 characters long.');
+      return;
+    }
+    if (newPass !== confirmPass) {
+      setPassError('New password and confirmation password do not match.');
+      return;
+    }
+    setShowPassModal(true);
+  };
+
+  const handleConfirmPasswordChange = async () => {
+    setChangingPass(true);
+    setPassError(null);
+    try {
+      const res = await changePassword(newPass);
+      if (!res.success) {
+        setPassError(res.error || 'Failed to update password.');
+        setShowPassModal(false);
+      } else {
+        setPassSuccess('Password updated successfully! Logging out...');
+        setShowPassModal(false);
+        setTimeout(async () => {
+          await logout();
+        }, 800);
+      }
+    } finally {
+      setChangingPass(false);
+    }
+  };
+
+  const sidebarItems = [
+    { id: 'account' as const, label: 'Account Info', icon: User },
+    { id: 'theme' as const, label: 'Appearance & Theme', icon: Sun },
+    { id: 'language' as const, label: 'Language', icon: Globe },
+    { id: 'password' as const, label: 'Change Password', icon: KeyRound },
+    ...(isMainAdmin ? [{ id: 'users' as const, label: 'Sub-Tenant Creation', icon: Users, badge: 'Admin' }] : []),
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 dark:border-gray-700 max-h-[90vh] flex flex-col">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-100 dark:border-gray-700 h-[85vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-            <h2 className="font-bold text-gray-900 dark:text-gray-100">{t('settingsTitle', lang)}</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0 bg-white dark:bg-gray-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold">
+              <Settings className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="font-bold text-gray-900 dark:text-gray-100 text-base">{t('settingsTitle', lang)}</h2>
+              <p className="text-[11px] text-gray-400">Manage account details, preferences &amp; user management</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors">
             <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 
-        {/* Tab switch for Main Admin */}
-        {isMainAdmin && (
-          <div className="flex border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 px-5 pt-2 flex-shrink-0">
-            <button
-              onClick={() => setActiveSettingsTab('general')}
-              className={`pb-2.5 px-4 text-xs font-bold transition-all border-b-2 ${
-                activeSettingsTab === 'general'
-                  ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-              }`}
-            >
-              General Settings
-            </button>
-            <button
-              onClick={() => setActiveSettingsTab('users')}
-              className={`pb-2.5 px-4 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 ${
-                activeSettingsTab === 'users'
-                  ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>User Management</span>
-              <span className="bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
-                Admin
-              </span>
-            </button>
+        {/* 2-Column Sidebar & Content Layout */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left Sidebar Column */}
+          <div className="w-64 border-r border-gray-100 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/50 p-3 space-y-1 flex-shrink-0 overflow-y-auto">
+            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 py-1.5">Settings Menu</p>
+            {sidebarItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeSettingsTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSettingsTab(item.id)}
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                    isActive
+                      ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 truncate">
+                    <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-400 dark:text-gray-500'}`} />
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                  {item.badge && (
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-bold ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300'
+                    }`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-        )}
 
-        {/* Body Content */}
-        <div className="p-5 overflow-y-auto flex-1 space-y-5">
-          {activeSettingsTab === 'general' ? (
-            <>
-              {/* Language Selection */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <Globe className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                  <span>{t('languageSelection', lang)}</span>
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {languages.map((l) => (
-                    <button
-                      key={l.id}
-                      onClick={() => onLangChange(l.id)}
-                      className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-xl border-2 transition-all ${
-                        lang === l.id
-                          ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 font-bold shadow-2xs'
-                          : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                      }`}
-                    >
-                      <span className="text-xl">{l.flag}</span>
-                      <span className="text-xs font-semibold">{l.label}</span>
-                    </button>
-                  ))}
+          {/* Right Main Content Area */}
+          <div className="flex-1 p-6 overflow-y-auto bg-white dark:bg-gray-800">
+            {/* 1. ACCOUNT INFO SECTION */}
+            {activeSettingsTab === 'account' && (
+              <div className="space-y-6 max-w-xl">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <User className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    <span>Account Information</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">View user credentials and customize your tenant avatar profile</p>
+                </div>
+
+                {/* Profile Card */}
+                <div className="p-4 bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl flex items-center gap-4">
+                  <Avatar profile={partner1} size="lg" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100 truncate">{partner1.name}</h4>
+                      {isMainAdmin ? (
+                        <span className="text-[9px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-full font-bold">Main Admin</span>
+                      ) : (
+                        <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold">Sub-Admin</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 font-mono mt-0.5">@{userProfile?.username || 'user'}</p>
+                    <p className="text-xs text-gray-400 truncate">{userProfile?.email}</p>
+                  </div>
+                  <button
+                    onClick={onOpenAvatarPicker}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-colors shadow-xs"
+                  >
+                    Change Avatar
+                  </button>
+                </div>
+
+                {/* Account Details Form */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Username</label>
+                    <input
+                      type="text"
+                      value={`@${userProfile?.username || ''}`}
+                      disabled
+                      className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-100 dark:bg-gray-900 text-gray-500 font-mono cursor-not-allowed"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Username is tenant-specific and cannot be modified.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      value={userProfile?.email || ''}
+                      disabled
+                      className="w-full px-3 py-2 text-xs border border-gray-200 dark:border-gray-700 rounded-xl bg-gray-100 dark:bg-gray-900 text-gray-500 font-mono cursor-not-allowed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Display Name</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={profileNameInput}
+                        onChange={(e) => setProfileNameInput(e.target.value)}
+                        placeholder="Enter your name"
+                        className="flex-1 px-3 py-2 text-xs border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-400"
+                      />
+                      <button
+                        onClick={handleSaveProfileName}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors"
+                      >
+                        {profileNameSaved ? 'Saved! ✓' : 'Save Name'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
+            )}
 
-              {/* Theme Switcher */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2.5">
-                  {t('appearanceTheme', lang)}
-                </label>
-                <div className="grid grid-cols-2 gap-3">
+            {/* 2. THEME SECTION */}
+            {activeSettingsTab === 'theme' && (
+              <div className="space-y-6 max-w-xl">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <Sun className="w-5 h-5 text-amber-500" />
+                    <span>Appearance &amp; Theme</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Customize application dark mode / light mode interface</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   <button
                     onClick={() => onThemeChange('light')}
-                    className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${
+                    className={`flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border-2 transition-all ${
                       theme === 'light'
-                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 font-bold shadow-xs'
+                        ? 'border-indigo-600 bg-indigo-50/70 text-indigo-700 font-bold shadow-md'
                         : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                     }`}
                   >
-                    <Sun className="w-5 h-5 text-amber-500" />
-                    <span className="text-xs">{t('lightMode', lang)}</span>
-                    {theme === 'light' && <span className="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded-full">{t('active', lang)}</span>}
+                    <Sun className="w-8 h-8 text-amber-500" />
+                    <span className="text-sm font-semibold">{t('lightMode', lang)}</span>
+                    {theme === 'light' && <span className="text-[10px] bg-indigo-600 text-white px-2.5 py-0.5 rounded-full font-bold">{t('active', lang)}</span>}
                   </button>
 
                   <button
                     onClick={() => onThemeChange('dark')}
-                    className={`flex flex-col items-center justify-center gap-2 p-3.5 rounded-xl border-2 transition-all ${
+                    className={`flex flex-col items-center justify-center gap-3 p-5 rounded-2xl border-2 transition-all ${
                       theme === 'dark'
-                        ? 'border-indigo-500 bg-gray-900 text-indigo-400 font-bold shadow-xs'
+                        ? 'border-indigo-500 bg-gray-900 text-indigo-400 font-bold shadow-md'
                         : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                     }`}
                   >
-                    <Moon className="w-5 h-5 text-indigo-400" />
-                    <span className="text-xs">{t('darkMode', lang)}</span>
-                    {theme === 'dark' && <span className="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded-full">{t('active', lang)}</span>}
+                    <Moon className="w-8 h-8 text-indigo-400" />
+                    <span className="text-sm font-semibold">{t('darkMode', lang)}</span>
+                    {theme === 'dark' && <span className="text-[10px] bg-indigo-500 text-white px-2.5 py-0.5 rounded-full font-bold">{t('active', lang)}</span>}
                   </button>
                 </div>
               </div>
-            </>
-          ) : (
-            /* User Management Tab for Main Admin */
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
+            )}
+
+            {/* 3. LANGUAGE SECTION */}
+            {activeSettingsTab === 'language' && (
+              <div className="space-y-6 max-w-xl">
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Sub-Admins & Trip Users</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Manage user credentials, component access, trip access & permissions</p>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    <span>Language Selection</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Select your preferred display language for application interface</p>
                 </div>
-                {!showAddForm && (
-                  <button
-                    onClick={() => { resetForm(); setShowAddForm(true); }}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors shadow-xs"
-                  >
-                    <UserPlus className="w-3.5 h-3.5" />
-                    <span>Create User</span>
-                  </button>
-                )}
-              </div>
 
-              {/* Form Alert Messages */}
-              {formError && (
-                <div className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-xs text-red-700 dark:text-red-300">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
-              {formSuccess && (
-                <div className="p-3 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-2 text-xs text-green-700 dark:text-green-300">
-                  <Check className="w-4 h-4 flex-shrink-0" />
-                  <span>{formSuccess}</span>
-                </div>
-              )}
-
-              {/* Add / Edit Form */}
-              {showAddForm && (
-                <form onSubmit={handleCreateUser} className="bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-700 space-y-3">
-                  <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
-                    <h4 className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                      {editingUserId ? 'Edit Sub-Admin / Trip User' : 'Create New Sub-Admin / Trip User'}
-                    </h4>
-                    <button type="button" onClick={resetForm} className="text-gray-400 hover:text-gray-600">
-                      <X className="w-4 h-4" />
+                <div className="grid grid-cols-3 gap-3">
+                  {languages.map((l) => (
+                    <button
+                      key={l.id}
+                      onClick={() => onLangChange(l.id)}
+                      className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                        lang === l.id
+                          ? 'border-indigo-600 bg-indigo-50/80 dark:bg-indigo-950/70 text-indigo-700 dark:text-indigo-300 font-bold shadow-md'
+                          : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                      }`}
+                    >
+                      <span className="text-3xl">{l.flag}</span>
+                      <span className="text-sm font-semibold">{l.label}</span>
+                      {lang === l.id && <span className="text-[9px] bg-indigo-600 text-white px-2 py-0.2 rounded-full font-bold">Selected</span>}
                     </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 4. CHANGE PASSWORD SECTION */}
+            {activeSettingsTab === 'password' && (
+              <div className="space-y-6 max-w-md">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                    <KeyRound className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    <span>Change Account Password</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Update your account password. Confirming will sign you out so you can log in with your new password.
+                  </p>
+                </div>
+
+                {passError && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-2 text-xs text-red-700 dark:text-red-300">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{passError}</span>
+                  </div>
+                )}
+                {passSuccess && (
+                  <div className="p-3 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 rounded-xl flex items-center gap-2 text-xs text-green-700 dark:text-green-300">
+                    <Check className="w-4 h-4 flex-shrink-0" />
+                    <span>{passSuccess}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleRequestPasswordChange} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">New Password *</label>
+                    <input
+                      type="password"
+                      value={newPass}
+                      onChange={(e) => setNewPass(e.target.value)}
+                      placeholder="Min 4 characters"
+                      required
+                      minLength={4}
+                      className="w-full px-3 py-2.5 text-xs border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-400"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Username</label>
-                      <input
-                        type="text"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        placeholder="e.g. tripuser1"
-                        required
-                        className="w-full px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Email</label>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="user@example.com"
-                        required
-                        className="w-full px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Confirm New Password *</label>
+                    <input
+                      type="password"
+                      value={confirmPass}
+                      onChange={(e) => setConfirmPass(e.target.value)}
+                      placeholder="Re-enter new password"
+                      required
+                      minLength={4}
+                      className="w-full px-3 py-2.5 text-xs border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-400"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Full Name</label>
-                      <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Alex Smith"
-                        required
-                        className="w-full px-2.5 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-1">Password</label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          required
-                          minLength={4}
-                          className="w-full pl-2.5 pr-8 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5"
-                          title={showPassword ? 'Hide password' : 'Show password'}
-                        >
-                          {showPassword ? (
-                            <EyeOff className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                          ) : (
-                            <Eye className="w-3.5 h-3.5" />
-                          )}
-                        </button>
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs flex items-center justify-center gap-2"
+                  >
+                    <KeyRound className="w-4 h-4" />
+                    <span>Change Password &amp; Log Out</span>
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* 5. SUB-TENANT CREATION (USER MANAGEMENT) */}
+            {activeSettingsTab === 'users' && isMainAdmin && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                      <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      <span>Sub-Admins &amp; Trip Users Management</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Manage credentials, section access &amp; trip permissions for sub-tenants</p>
+                  </div>
+                  {!showAddForm && (
+                    <button
+                      onClick={() => { resetForm(); setShowAddForm(true); }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-xl hover:bg-indigo-700 transition-colors shadow-xs"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Create User</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* User management list & form... */}
+                {formError && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-2 text-xs text-red-700 dark:text-red-300">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{formError}</span>
+                  </div>
+                )}
+                {formSuccess && (
+                  <div className="p-3 bg-green-50 dark:bg-green-950/60 border border-green-200 dark:border-green-800 rounded-xl flex items-center gap-2 text-xs text-green-700 dark:text-green-300">
+                    <Check className="w-4 h-4 flex-shrink-0" />
+                    <span>{formSuccess}</span>
+                  </div>
+                )}
+
+                {showAddForm && (
+                  <form onSubmit={handleCreateUser} className="bg-gray-50 dark:bg-gray-900/80 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 bg-indigo-600 dark:bg-indigo-700">
+                      <div className="flex items-center gap-2">
+                        <UserPlus className="w-4 h-4 text-white" />
+                        <h4 className="text-xs font-bold text-white">
+                          {editingUserId ? 'Edit Sub-Admin / Trip User' : 'Create New Sub-Admin / Trip User'}
+                        </h4>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Access Level Selector */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1.5">
-                      Access Permission Level:
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAccessLevel('edit')}
-                        className={`p-2 rounded-lg border text-left text-xs transition-colors flex items-center gap-2 ${
-                          accessLevel === 'edit'
-                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold'
-                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-                        }`}
-                      >
-                        <Pencil className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-                        <div>
-                          <div className="font-semibold text-xs">Edit Access</div>
-                          <div className="text-[9px] text-gray-400">Can view, add, edit & delete</div>
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setAccessLevel('view_only')}
-                        className={`p-2 rounded-lg border text-left text-xs transition-colors flex items-center gap-2 ${
-                          accessLevel === 'view_only'
-                            ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold'
-                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-                        }`}
-                      >
-                        <Eye className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                        <div>
-                          <div className="font-semibold text-xs">View Only</div>
-                          <div className="text-[9px] text-gray-400">Read-only, editing disabled</div>
-                        </div>
+                      <button type="button" onClick={resetForm} className="text-white/70 hover:text-white transition-colors">
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
 
-                  {/* Component Access Checkboxes */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1.5">
-                      Allowed Component Access:
-                    </label>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {COMPONENT_OPTIONS.map((comp) => {
-                        const isSelected = allowedComponents.includes(comp.id);
-                        return (
-                          <button
-                            key={comp.id}
-                            type="button"
-                            onClick={() => handleToggleComponent(comp.id)}
-                            className={`flex items-center gap-2 p-2 rounded-lg border text-left text-xs transition-colors ${
-                              isSelected
-                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold'
-                                : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-                            }`}
-                          >
-                            {isSelected ? (
-                              <CheckSquare className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-                            ) : (
-                              <Square className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                            )}
-                            <span className="truncate">{comp.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                    <div className="p-4 space-y-4">
+                      <div>
+                        <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                          <Lock className="w-3 h-3" /> Login Credentials
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-300 mb-1">Username *</label>
+                            <input
+                              type="text"
+                              value={username}
+                              onChange={(e) => setUsername(e.target.value)}
+                              placeholder="e.g. tripuser1"
+                              required
+                              className="w-full px-2.5 py-2 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-300 mb-1">Email *</label>
+                            <input
+                              type="email"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              placeholder="user@example.com"
+                              required
+                              className="w-full px-2.5 py-2 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-300 mb-1">Full Name *</label>
+                            <input
+                              type="text"
+                              value={name}
+                              onChange={(e) => setName(e.target.value)}
+                              placeholder="e.g. Alex Smith"
+                              required
+                              className="w-full px-2.5 py-2 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-300 mb-1">Password *</label>
+                            <div className="relative">
+                              <input
+                                type={showPassword ? 'text' : 'password'}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="Min 4 characters"
+                                required
+                                minLength={4}
+                                className="w-full pl-2.5 pr-8 py-2 text-xs border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                              >
+                                {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
 
-                  {/* Specific Trip Expenses Selection */}
-                  {allowedComponents.includes('expenses') && (
-                    <div>
-                      <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-300 mb-1.5 flex items-center justify-between">
-                        <span>Assigned Trip Expenses:</span>
-                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-normal">Control which trips user can see</span>
-                      </label>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleTrip('*')}
-                          className={`flex items-center gap-2 p-2 rounded-lg border text-left text-xs transition-colors ${
-                            allowedTripIds.includes('*')
-                              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold'
-                              : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-                          }`}
-                        >
-                          {allowedTripIds.includes('*') ? (
-                            <CheckSquare className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-                          ) : (
-                            <Square className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                          )}
-                          <span className="truncate font-semibold">All Trips (*)</span>
-                        </button>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Permission Level</p>
+                            <div className="space-y-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setAccessLevel('edit')}
+                                className={`w-full p-2.5 rounded-lg border text-left text-xs transition-colors flex items-center gap-2 ${
+                                  accessLevel === 'edit'
+                                    ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-bold'
+                                    : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                <Pencil className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                                <div>
+                                  <div className="font-semibold">Edit Access</div>
+                                  <div className="text-[9px] text-gray-400">Can add, edit &amp; delete</div>
+                                </div>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setAccessLevel('view_only')}
+                                className={`w-full p-2.5 rounded-lg border text-left text-xs transition-colors flex items-center gap-2 ${
+                                  accessLevel === 'view_only'
+                                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-bold'
+                                    : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                <Eye className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                <div>
+                                  <div className="font-semibold">View Only</div>
+                                  <div className="text-[9px] text-gray-400">Read-only mode</div>
+                                </div>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
 
-                        {availableTrips.map((t) => {
-                          const isSelected = !allowedTripIds.includes('*') && allowedTripIds.includes(t.id);
-                          return (
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Allowed Sections</p>
+                          <div className="space-y-1">
+                            {COMPONENT_OPTIONS.map((comp) => {
+                              const isSelected = allowedComponents.includes(comp.id);
+                              return (
+                                <button
+                                  key={comp.id}
+                                  type="button"
+                                  onClick={() => handleToggleComponent(comp.id)}
+                                  className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left text-xs transition-colors ${
+                                    isSelected
+                                      ? 'border-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold'
+                                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {isSelected
+                                    ? <CheckSquare className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                                    : <Square className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                                  }
+                                  <span className="truncate">{comp.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {allowedComponents.includes('expenses') && (
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+                            <span>Assigned Trip Expenses</span>
+                            <span className="text-[9px] text-indigo-500 font-normal normal-case">Controls which trips user can view</span>
+                          </p>
+                          <div className="grid grid-cols-3 gap-1.5">
                             <button
-                              key={t.id}
                               type="button"
-                              onClick={() => handleToggleTrip(t.id)}
-                              className={`flex items-center gap-2 p-2 rounded-lg border text-left text-xs transition-colors ${
-                                isSelected
+                              onClick={() => handleToggleTrip('*')}
+                              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg border text-left text-xs transition-colors ${
+                                allowedTripIds.includes('*')
                                   ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold'
-                                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300'
+                                  : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50'
                               }`}
                             >
-                              {isSelected ? (
-                                <CheckSquare className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-                              ) : (
-                                <Square className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                              )}
-                              <span className="truncate">{t.title}</span>
+                              {allowedTripIds.includes('*')
+                                ? <CheckSquare className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                                : <Square className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                              }
+                              <span className="font-bold truncate">All Trips</span>
                             </button>
-                          );
-                        })}
+                            {availableTrips.map((t) => {
+                              const isSelected = !allowedTripIds.includes('*') && allowedTripIds.includes(t.id);
+                              return (
+                                <button
+                                  key={t.id}
+                                  type="button"
+                                  onClick={() => handleToggleTrip(t.id)}
+                                  className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg border text-left text-xs transition-colors ${
+                                    isSelected
+                                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold'
+                                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {isSelected
+                                    ? <CheckSquare className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                                    : <Square className="w-3.5 h-3.5 text-gray-300 flex-shrink-0" />
+                                  }
+                                  <span className="truncate">{t.title}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {availableTrips.length === 0 && (
+                            <p className="text-[10px] text-gray-400 italic mt-1">No trips found. Create trips first to assign specific ones.</p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 pt-1 border-t border-gray-200 dark:border-gray-700">
+                        <button
+                          type="submit"
+                          disabled={submitting}
+                          className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 disabled:opacity-60"
+                        >
+                          {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                          <span>{editingUserId ? 'Save Changes' : 'Create User'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetForm}
+                          className="px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                          Cancel
+                        </button>
                       </div>
                     </div>
-                  )}
+                  </form>
+                )}
 
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 disabled:opacity-60"
-                    >
-                      {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      <span>{editingUserId ? 'Save Changes' : 'Create User'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={resetForm}
-                      className="px-3 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-lg hover:bg-gray-300 transition-colors"
-                    >
-                      Cancel
-                    </button>
+                {loadingUsers ? (
+                  <div className="flex justify-center py-6">
+                    <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
                   </div>
-                </form>
-              )}
-
-              {/* Users List */}
-              {loadingUsers ? (
-                <div className="flex justify-center py-6 text-gray-400">
-                  <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
-                </div>
-              ) : usersList.length === 0 ? (
-                <div className="text-center py-6 border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
-                  <Users className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-                  <p className="text-xs text-gray-500 dark:text-gray-400">No sub-admin or trip users created yet.</p>
-                  <button
-                    onClick={() => { resetForm(); setShowAddForm(true); }}
-                    className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
-                  >
-                    + Add your first user
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {usersList.map((u) => {
-                    const isViewOnly = u.access_level === 'view_only';
-                    return (
-                      <div
-                        key={u.id}
-                        className="p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 shadow-2xs flex flex-col gap-2"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 dark:text-indigo-300 font-bold text-xs">
-                              {u.name.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{u.name}</span>
-                                <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.2 rounded-full font-mono">
-                                  @{u.username}
-                                </span>
-                                {isViewOnly ? (
-                                  <span className="text-[9px] bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5">
-                                    <Eye className="w-2.5 h-2.5" /> View Only
-                                  </span>
-                                ) : (
-                                  <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5">
-                                    <Pencil className="w-2.5 h-2.5" /> Edit Access
-                                  </span>
-                                )}
+                ) : usersList.length === 0 ? (
+                  <div className="text-center py-8 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
+                    <Users className="w-10 h-10 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400">No sub-admins created yet</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Click "Create User" to add sub-admins or trip users</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">{usersList.length} User{usersList.length !== 1 ? 's' : ''}</p>
+                    {usersList.map((u) => {
+                      const isViewOnly = u.access_level === 'view_only';
+                      return (
+                        <div key={u.id} className="bg-white dark:bg-gray-800/80 rounded-xl border border-gray-100 dark:border-gray-700 overflow-hidden">
+                          <div className="flex items-center justify-between px-3 py-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                                {u.name.charAt(0).toUpperCase()}
                               </div>
-                              <p className="text-[10px] text-gray-400 dark:text-gray-400">{u.email}</p>
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-bold text-gray-900 dark:text-gray-100">{u.name}</span>
+                                  {isViewOnly ? (
+                                    <span className="text-[9px] bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5">
+                                      <Eye className="w-2.5 h-2.5" /> View Only
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5">
+                                      <Pencil className="w-2.5 h-2.5" /> Edit Access
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.2 rounded">@{u.username}</span>
+                                  <span className="text-[10px] text-gray-400 dark:text-gray-500">{u.email}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => startEditUser(u)}
+                                title="Edit User &amp; Permissions"
+                                className="p-1.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition-colors"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(u)}
+                                title="Delete User"
+                                className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => startEditUser(u)}
-                              title="Edit User & Permissions"
-                              className="p-1.5 text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(u)}
-                              title="Delete User"
-                              className="p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                          <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/40 border-t border-gray-100 dark:border-gray-700/60 flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Sections:</span>
+                              {Array.isArray(u.allowed_components) && u.allowed_components.length > 0 ? (
+                                u.allowed_components.map((c) => {
+                                  const compLabel = COMPONENT_OPTIONS.find((opt) => opt.id === c)?.label || c;
+                                  return (
+                                    <span key={c} className="text-[9px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.5 rounded font-medium">
+                                      {compLabel}
+                                    </span>
+                                  );
+                                })
+                              ) : (
+                                <span className="text-[9px] text-red-400 italic">None assigned</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Trips:</span>
+                              {!u.allowed_trip_ids || u.allowed_trip_ids.includes('*') ? (
+                                <span className="text-[9px] bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 rounded font-medium">
+                                  All Trips
+                                </span>
+                              ) : (
+                                u.allowed_trip_ids.map((tid) => {
+                                  const tripObj = availableTrips.find((at) => at.id === tid);
+                                  return (
+                                    <span key={tid} className="text-[9px] bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-1.5 py-0.5 rounded font-medium">
+                                      {tripObj?.title || tid}
+                                    </span>
+                                  );
+                                })
+                              )}
+                            </div>
                           </div>
                         </div>
-
-                        {/* Allowed Components & Trips Badges */}
-                        <div className="flex flex-wrap items-center gap-1 pt-1 border-t border-gray-50 dark:border-gray-700/60">
-                          <span className="text-[10px] text-gray-400 font-medium">Access:</span>
-                          {Array.isArray(u.allowed_components) && u.allowed_components.length > 0 ? (
-                            u.allowed_components.map((c) => {
-                              const compLabel = COMPONENT_OPTIONS.find((opt) => opt.id === c)?.label || c;
-                              return (
-                                <span
-                                  key={c}
-                                  className="text-[9px] bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 px-1.5 py-0.2 rounded-md font-medium"
-                                >
-                                  {compLabel}
-                                </span>
-                              );
-                            })
-                          ) : (
-                            <span className="text-[9px] text-red-500 italic">No components assigned</span>
-                          )}
-
-                          {/* Assigned Trips Badge */}
-                          <span className="text-[10px] text-gray-400 font-medium ml-1">Trips:</span>
-                          {!u.allowed_trip_ids || u.allowed_trip_ids.includes('*') ? (
-                            <span className="text-[9px] bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.2 rounded-md font-medium">
-                              All Trips (*)
-                            </span>
-                          ) : (
-                            u.allowed_trip_ids.map((tid) => {
-                              const tripObj = availableTrips.find((at) => at.id === tid);
-                              return (
-                                <span
-                                  key={tid}
-                                  className="text-[9px] bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 px-1.5 py-0.2 rounded-md font-medium"
-                                >
-                                  {tripObj?.title || tid}
-                                </span>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="px-5 pb-5 pt-2 flex-shrink-0 border-t border-gray-100 dark:border-gray-700">
+        {/* Modal Footer */}
+        <div className="px-6 py-3 border-t border-gray-100 dark:border-gray-700 flex justify-end bg-gray-50/50 dark:bg-gray-900/50 flex-shrink-0">
           <button
             onClick={onClose}
-            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl shadow-xs transition-colors"
+            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
           >
             {t('done', lang)}
           </button>
         </div>
       </div>
+
+      {/* CONFIRMATION PROMPT FOR PASSWORD CHANGE LOGOUT */}
+      {showPassModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-150">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-950 flex items-center justify-center text-amber-600 flex-shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-gray-900 dark:text-gray-100 text-sm">Confirm Password Change</h4>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Logout required to activate new password</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+              Changing your password will update your credentials and log you out immediately. You will be redirected to the login screen to sign in with your new password.
+            </p>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={handleConfirmPasswordChange}
+                disabled={changingPass}
+                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-colors shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-60"
+              >
+                {changingPass && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>Confirm &amp; Log Out</span>
+              </button>
+              <button
+                onClick={() => setShowPassModal(false)}
+                className="px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -847,7 +1101,7 @@ function AvatarPickerModal({ profile, onSave, onClose }: { profile: PartnerProfi
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4 animate-in fade-in duration-150">
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-100 dark:border-gray-700">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
           <h2 className="font-semibold text-gray-900 dark:text-gray-100">Edit Profile</h2>
@@ -924,19 +1178,14 @@ function AvatarPickerModal({ profile, onSave, onClose }: { profile: PartnerProfi
   );
 }
 
-// ── Partner selector button ───────────────────────────────────────────────────
-function PartnerButton({ profile, active, onSelect, onEdit }: { profile: PartnerProfile; active: boolean; onSelect: () => void; onEdit: () => void }) {
+// ── Display-only User Avatar Badge (Avatar editing is managed in Settings > Account Info) ─────────
+function UserAvatarBadge({ profile }: { profile: PartnerProfile }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="relative group">
-        <button onClick={onSelect} className={`rounded-full transition-all ${active ? 'ring-[3px] ring-indigo-500 ring-offset-2' : 'ring-2 ring-transparent hover:ring-gray-300 ring-offset-1'}`}>
-          <Avatar profile={profile} size="md" />
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); onEdit(); }} className="absolute -bottom-0.5 -right-0.5 w-5 h-5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-indigo-50 dark:hover:bg-gray-700">
-          <Pencil className="w-2.5 h-2.5 text-gray-600 dark:text-gray-300" />
-        </button>
-      </div>
-      <span className={`text-[10px] font-medium truncate max-w-[52px] text-center ${active ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400'}`}>{profile.name}</span>
+    <div className="flex flex-col items-center gap-1 select-none">
+      <Avatar profile={profile} size="md" />
+      <span className="text-[10px] font-semibold truncate max-w-[70px] text-center text-gray-700 dark:text-gray-300">
+        {profile.name}
+      </span>
     </div>
   );
 }
@@ -957,6 +1206,7 @@ export default function App() {
     createAppUser,
     updateAppUser,
     deleteAppUser,
+    changePassword,
   } = useAuth();
 
   const { isInstallable, promptInstall } = usePWA();
@@ -989,13 +1239,23 @@ export default function App() {
     localStorage.setItem('tmd_language', lang);
   }, [lang]);
 
-  // Start background notification scheduler engine
+  // Ensure profile avatar defaults to first letter of username / name for new accounts/sub-admins
   useEffect(() => {
-    startNotificationScheduler();
-    return () => {
-      stopNotificationScheduler();
-    };
-  }, []);
+    if (!userProfile) return;
+    const initial = (userProfile.username || userProfile.name || 'U').charAt(0).toUpperCase();
+    const displayName = userProfile.name || userProfile.username || 'User';
+
+    if (!config.partner1 || config.partner1.name === 'Partner 1') {
+      const updatedPartner: PartnerProfile = {
+        name: displayName,
+        avatarType: 'letter',
+        letter: initial,
+        bgColor: userProfile.isMainAdmin ? '#6366f1' : '#10b981',
+      };
+      setConfig((prev) => ({ ...prev, partner1: updatedPartner }));
+      setTimeout(saveConfig, 0);
+    }
+  }, [userProfile]);
 
   // Unsaved-changes guard
   const [pendingTab, setPendingTab] = useState<Tab | null>(null);
@@ -1122,13 +1382,13 @@ export default function App() {
             </div>
 
             <div className="flex items-end gap-3 flex-shrink-0">
-              <PartnerButton profile={partner1} active={true} onSelect={() => {}} onEdit={() => setEditingPartner('partner1')} />
+              <UserAvatarBadge profile={partner1} />
 
-              {/* Settings Button Next to User Profile */}
+              {/* Settings Button */}
               <button
                 onClick={() => setShowSettingsModal(true)}
                 title={t('settings', lang)}
-                className="flex flex-col items-center gap-1 group"
+                className="flex flex-col items-center gap-1 group cursor-pointer"
               >
                 <div className="w-11 h-11 rounded-full flex items-center justify-center ring-2 ring-gray-200 dark:ring-gray-700 hover:ring-indigo-400 bg-gray-50 dark:bg-gray-700/60 hover:bg-indigo-50 dark:hover:bg-gray-700 transition-all">
                   <Settings className="w-4 h-4 text-gray-600 dark:text-gray-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
@@ -1259,6 +1519,13 @@ export default function App() {
           lang={lang}
           onLangChange={setLang}
           userProfile={userProfile}
+          partner1={partner1}
+          onUpdateProfileName={(newName) => {
+            setPartner1({ ...partner1, name: newName });
+          }}
+          onOpenAvatarPicker={() => setEditingPartner('partner1')}
+          changePassword={changePassword}
+          logout={logout}
           fetchAppUsers={fetchAppUsers}
           createAppUser={createAppUser}
           updateAppUser={updateAppUser}
