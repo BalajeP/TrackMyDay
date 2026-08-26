@@ -50,6 +50,18 @@ export interface Expense {
   icon?: string;
   items?: ExpenseItem[];
   customColumns?: string[];
+  updatedAt?: string;
+}
+
+function formatLastUpdated(isoString?: string): string {
+  if (!isoString) return '';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString;
+    return format(d, 'MMM d, yyyy @ h:mm a');
+  } catch (e) {
+    return isoString || '';
+  }
 }
 
 interface Props {
@@ -578,7 +590,7 @@ export default function Expenditure({
         if (exp.id === expenseId) {
           const currentCols = exp.customColumns || [];
           if (!currentCols.includes(col)) {
-            return { ...exp, customColumns: [...currentCols, col] };
+            return { ...exp, customColumns: [...currentCols, col], updatedAt: new Date().toISOString() };
           }
         }
         return exp;
@@ -608,7 +620,7 @@ export default function Expenditure({
               }
               return item;
             });
-            return { ...exp, customColumns: updatedCols, items: updatedItems };
+            return { ...exp, customColumns: updatedCols, items: updatedItems, updatedAt: new Date().toISOString() };
           }
           return exp;
         })
@@ -630,7 +642,7 @@ export default function Expenditure({
             }
             return item;
           });
-          return { ...exp, customColumns: updatedCols, items: updatedItems };
+          return { ...exp, customColumns: updatedCols, items: updatedItems, updatedAt: new Date().toISOString() };
         }
         return exp;
       })
@@ -676,6 +688,7 @@ export default function Expenditure({
       icon: selectedIcon,
       items: [],
       customColumns: [],
+      updatedAt: new Date().toISOString(),
     };
 
     setExpenses([created, ...expenses]);
@@ -714,6 +727,7 @@ export default function Expenditure({
             ...exp,
             amount: newTotal,
             items: updatedItems,
+            updatedAt: new Date().toISOString(),
           };
         }
         return exp;
@@ -744,6 +758,7 @@ export default function Expenditure({
             ...exp,
             amount: newTotal,
             items: updatedItems,
+            updatedAt: new Date().toISOString(),
           };
         }
         return exp;
@@ -770,7 +785,7 @@ export default function Expenditure({
               : i
           );
           const newTotal = updatedItems.reduce((sum, i) => sum + i.amount, 0);
-          return { ...exp, amount: newTotal, items: updatedItems };
+          return { ...exp, amount: newTotal, items: updatedItems, updatedAt: new Date().toISOString() };
         }
         return exp;
       })
@@ -815,6 +830,7 @@ export default function Expenditure({
               ...e,
               description: trimmed,
               icon: editingExpense.icon || '🍔',
+              updatedAt: new Date().toISOString(),
             }
           : e
       )
@@ -1593,6 +1609,12 @@ export default function Expenditure({
                           </span>
                         </div>
 
+                        {/* Last Updated Date & Time */}
+                        <div className="flex items-center justify-center gap-1 text-[10px] text-gray-400 dark:text-gray-500 my-0.5">
+                          <Clock className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                          <span>Updated: {formatLastUpdated(expense.updatedAt || expense.date)}</span>
+                        </div>
+
                         <span className="text-[10px] text-indigo-500 dark:text-indigo-400 font-semibold group-hover:underline opacity-80 mb-1">
                           Click for details →
                         </span>
@@ -1739,6 +1761,12 @@ export default function Expenditure({
                     <span className="text-xs text-gray-400 dark:text-gray-500 font-medium flex-shrink-0">
                       ({(showAllModalHistory ? activeDetailExpense.items || [] : getExpenseFilteredItems(activeDetailExpense)).length} entries)
                     </span>
+                    {formatLastUpdated(activeDetailExpense.updatedAt || activeDetailExpense.date) && (
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium flex items-center gap-1 flex-shrink-0">
+                        <Clock className="w-3 h-3 text-gray-400 dark:text-gray-500" />
+                        <span>Updated: {formatLastUpdated(activeDetailExpense.updatedAt || activeDetailExpense.date)}</span>
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => setShowAllModalHistory((v) => !v)}

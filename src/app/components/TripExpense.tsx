@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
-import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical, Zap, UserX, UserCheck } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical, Zap, UserX, UserCheck, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -24,6 +24,18 @@ export interface Trip {
   expanded: boolean;
   columns: TripColumn[];
   entries: TripEntry[];
+  updatedAt?: string;
+}
+
+function formatLastUpdated(isoString?: string): string {
+  if (!isoString) return '';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString;
+    return format(d, 'MMM d, yyyy @ h:mm a');
+  } catch (e) {
+    return isoString || '';
+  }
 }
 
 export interface TripExpenseState {
@@ -277,7 +289,8 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
         { id: 'total_amount', name: 'Total Amount', type: 'number' },
         { id: 'spender', name: 'Spender', type: 'text' }
       ],
-      entries: []
+      entries: [],
+      updatedAt: new Date().toISOString(),
     };
 
     setState((prev) => ({
@@ -318,7 +331,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     setState((prev) => ({
       ...prev,
       trips: activeState.trips.map((t) =>
-        t.id === tripId ? { ...t, title: titleEditValue.trim() } : t
+        t.id === tripId ? { ...t, title: titleEditValue.trim(), updatedAt: new Date().toISOString() } : t
       )
     }));
     setEditingTitleId(null);
@@ -343,7 +356,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
           ...entry,
           data: { ...entry.data, [newColId]: '' }
         }));
-        return { ...t, columns: updatedColumns, entries: updatedEntries };
+        return { ...t, columns: updatedColumns, entries: updatedEntries, updatedAt: new Date().toISOString() };
       })
     }));
   };
@@ -387,7 +400,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
           }));
         }
 
-        return { ...t, columns: updatedColumns, entries: updatedEntries };
+        return { ...t, columns: updatedColumns, entries: updatedEntries, updatedAt: new Date().toISOString() };
       })
     }));
   };
@@ -409,7 +422,8 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
           ...t,
           columns: t.columns.map((col) =>
             col.id === columnId ? { ...col, name: columnEditValue.trim() } : col
-          )
+          ),
+          updatedAt: new Date().toISOString(),
         };
       })
     }));
@@ -427,7 +441,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
           delete newData[columnId];
           return { ...entry, data: newData };
         });
-        return { ...t, columns: updatedColumns, entries: updatedEntries };
+        return { ...t, columns: updatedColumns, entries: updatedEntries, updatedAt: new Date().toISOString() };
       })
     }));
     setConfirmDelete(null);
@@ -458,7 +472,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     setState((prev) => ({
       ...prev,
       trips: activeState.trips.map((t) =>
-        t.id === tripId ? { ...t, entries: [newEntry, ...t.entries] } : t
+        t.id === tripId ? { ...t, entries: [newEntry, ...t.entries], updatedAt: new Date().toISOString() } : t
       )
     }));
 
@@ -541,7 +555,8 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
         if (t.id !== tripId) return t;
         return {
           ...t,
-          entries: t.entries.map((e) => (e.id === entryId ? { ...e, data: buffer } : e))
+          entries: t.entries.map((e) => (e.id === entryId ? { ...e, data: buffer } : e)),
+          updatedAt: new Date().toISOString(),
         };
       })
     }));
@@ -596,7 +611,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
       ...prev,
       trips: activeState.trips.map((t) => {
         if (t.id !== tripId) return t;
-        return { ...t, entries: t.entries.filter((e) => e.id !== entryId) };
+        return { ...t, entries: t.entries.filter((e) => e.id !== entryId), updatedAt: new Date().toISOString() };
       })
     }));
     setConfirmDelete(null);
@@ -926,20 +941,28 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 group min-w-0">
-                          <h3
-                            onClick={(e) => { e.stopPropagation(); startEditingTitle(trip.id, trip.title); }}
-                            className="text-base font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer truncate"
-                          >
-                            {trip.title}
-                          </h3>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); startEditingTitle(trip.id, trip.title); }}
-                            className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-opacity"
-                            title="Edit Trip Title"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-2 group min-w-0">
+                            <h3
+                              onClick={(e) => { e.stopPropagation(); startEditingTitle(trip.id, trip.title); }}
+                              className="text-base font-bold text-gray-800 dark:text-gray-100 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer truncate"
+                            >
+                              {trip.title}
+                            </h3>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); startEditingTitle(trip.id, trip.title); }}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-opacity"
+                              title="Edit Trip Title"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          {formatLastUpdated(trip.updatedAt) && (
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-normal flex items-center gap-1 mt-0.5">
+                              <Clock className="w-3 h-3 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                              <span>Updated: {formatLastUpdated(trip.updatedAt)}</span>
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>
