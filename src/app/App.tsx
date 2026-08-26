@@ -1239,6 +1239,14 @@ export default function App() {
     localStorage.setItem('tmd_language', lang);
   }, [lang]);
 
+  // Initialize background notification scheduler for calendar event reminders
+  useEffect(() => {
+    startNotificationScheduler();
+    return () => {
+      stopNotificationScheduler();
+    };
+  }, []);
+
   // Ensure profile avatar defaults to first letter of username / name for new accounts/sub-admins
   useEffect(() => {
     if (!userProfile) return;

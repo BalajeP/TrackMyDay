@@ -63,28 +63,35 @@ function scheduleSwTimers() {
       const scheduledMs = new Date(`${dateStr}T${scheduledTime}:00`).getTime();
       if (!isNaN(scheduledMs)) {
         const delayMs = scheduledMs - nowMs;
-        // Schedule if in the future within next 48 hours
-        if (delayMs > 0 && delayMs < 48 * 60 * 60 * 1000) {
-          const timerId = setTimeout(async () => {
-            const notifKey = `${ev.id}_${dateStr}_${scheduledTime}`;
-            const title = `${ev.icon || '📌'} ${ev.title}`;
-            const timeDisplay = formatTime12h(scheduledTime);
-            const body = ev.date === dateStr
-              ? `🎯 Today is Event Day! (${dateStr} @ ${timeDisplay})\n${ev.todoText || ''}`
-              : `🔔 Reminder: Event scheduled for ${dateStr} @ ${timeDisplay}\n${ev.todoText || ''}`;
 
-            try {
-              await self.registration.showNotification(title, {
+        // Try OS-level TimestampTrigger if supported (Notification Triggers API)
+        if (delayMs > 0) {
+          try {
+            if ('showTrigger' in Notification.prototype && (self as any).TimestampTrigger) {
+              const notifKey = `${ev.id}_${dateStr}_${scheduledTime}`;
+              const title = `${ev.icon || '📌'} ${ev.title}`;
+              const timeDisplay = formatTime12h(scheduledTime);
+              const body = ev.date === dateStr
+                ? `🎯 Today is Event Day! (${dateStr} @ ${timeDisplay})\n${ev.todoText || ''}`
+                : `🔔 Reminder: Event scheduled for ${dateStr} @ ${timeDisplay}\n${ev.todoText || ''}`;
+
+              self.registration.showNotification(title, {
                 body,
                 icon: '/icon.svg',
                 badge: '/icon.svg',
                 tag: notifKey,
                 data: { url: '/' },
                 vibrate: [200, 100, 200],
-              } as NotificationOptions);
-            } catch (err) {
-              console.error('[SW] Failed to show scheduled notification:', err);
+                showTrigger: new ((self as any).TimestampTrigger)(scheduledMs),
+              } as any).catch(() => {});
             }
+          } catch (e) {}
+        }
+
+        // Schedule JS setTimeout inside SW (works while SW active)
+        if (delayMs > 0 && delayMs < 48 * 60 * 60 * 1000) {
+          const timerId = setTimeout(async () => {
+            await checkAndFireNotifications();
           }, delayMs);
 
           activeSwTimers.push(timerId);
@@ -94,36 +101,16 @@ function scheduleSwTimers() {
   });
 }
 
-// Load stored events from SW cache on activation
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.open('tmd-sw-events-v1').then(async (cache) => {
-      const resp = await cache.match('/sw-scheduled-events.json');
-      if (resp) {
-        try {
-          storedEvents = await resp.json();
-          scheduleSwTimers();
-        } catch (e) {
-          console.error('[SW] Failed to parse cached events:', e);
-        }
-      }
-    })
-  );
-});
-
 // Helper to check and fire due notifications inside Service Worker
 async function checkAndFireNotifications() {
   if (!storedEvents || storedEvents.length === 0) return;
 
+  const nowMs = Date.now();
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   const currentDateStr = `${year}-${month}-${day}`;
-
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const currentTimeStr = `${hours}:${minutes}`;
 
   // Get fired notifications set from cache
   const cache = await caches.open('tmd-sw-events-v1');
@@ -135,46 +122,86 @@ async function checkAndFireNotifications() {
     } catch (e) {}
   }
   const firedSet = new Set(firedKeys);
+  let changed = false;
 
   for (const ev of storedEvents) {
     if (ev.completed) continue;
 
     const targetDates = Array.from(new Set([ev.date, ...(ev.notificationDates || [])]));
-    if (!targetDates.includes(currentDateStr)) continue;
 
-    const scheduledTime = getEventScheduledTime(ev);
-    if (currentTimeStr === scheduledTime) {
-      const notifKey = `${ev.id}_${currentDateStr}_${scheduledTime}`;
-      if (!firedSet.has(notifKey)) {
-        const title = `${ev.icon || '📌'} ${ev.title}`;
-        const isMainDay = ev.date === currentDateStr;
-        const timeDisplay = formatTime12h(scheduledTime);
-        const body = isMainDay
-          ? `🎯 Today is Event Day! (${currentDateStr} @ ${timeDisplay})\n${ev.todoText || ''}`
-          : `🔔 Reminder: Event scheduled for ${ev.date} @ ${timeDisplay}\n${ev.todoText || ''}`;
+    for (const dateStr of targetDates) {
+      const scheduledTime = getEventScheduledTime(ev);
+      const scheduledMs = new Date(`${dateStr}T${scheduledTime}:00`).getTime();
+      if (isNaN(scheduledMs)) continue;
 
-        await self.registration.showNotification(title, {
-          body,
-          icon: '/icon.svg',
-          badge: '/icon.svg',
-          tag: notifKey,
-          data: { url: '/' },
-          vibrate: [200, 100, 200],
-        } as NotificationOptions);
+      const diffMs = nowMs - scheduledMs;
 
-        firedSet.add(notifKey);
+      // Trigger if scheduled time reached (within 0 to 60 minutes window) and not yet fired
+      if (diffMs >= 0 && diffMs <= 60 * 60 * 1000) {
+        const notifKey = `${ev.id}_${dateStr}_${scheduledTime}`;
+        if (!firedSet.has(notifKey)) {
+          const title = `${ev.icon || '📌'} ${ev.title}`;
+          const isMainDay = ev.date === currentDateStr;
+          const timeDisplay = formatTime12h(scheduledTime);
+          const body = isMainDay
+            ? `🎯 Today is Event Day! (${currentDateStr} @ ${timeDisplay})\n${ev.todoText || ''}`
+            : `🔔 Reminder: Event scheduled for ${ev.date} @ ${timeDisplay}\n${ev.todoText || ''}`;
+
+          try {
+            await self.registration.showNotification(title, {
+              body,
+              icon: '/icon.svg',
+              badge: '/icon.svg',
+              tag: notifKey,
+              data: { url: '/' },
+              vibrate: [200, 100, 200],
+              renotify: true,
+            } as NotificationOptions);
+
+            firedSet.add(notifKey);
+            changed = true;
+          } catch (err) {
+            console.error('[SW] Error showing notification:', err);
+          }
+        }
       }
     }
   }
 
-  // Update fired keys in cache
-  cache.put(
-    '/sw-fired-notifications.json',
-    new Response(JSON.stringify(Array.from(firedSet).slice(-500)), {
-      headers: { 'content-type': 'application/json' },
-    })
-  );
+  if (changed) {
+    cache.put(
+      '/sw-fired-notifications.json',
+      new Response(JSON.stringify(Array.from(firedSet).slice(-500)), {
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+  }
 }
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+// Load stored events from SW cache on activation
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+      caches.open('tmd-sw-events-v1').then(async (cache) => {
+        const resp = await cache.match('/sw-scheduled-events.json');
+        if (resp) {
+          try {
+            storedEvents = await resp.json();
+            scheduleSwTimers();
+            await checkAndFireNotifications();
+          } catch (e) {
+            console.error('[SW] Failed to parse cached events:', e);
+          }
+        }
+      }),
+    ])
+  );
+});
 
 // Receive updated events from main app thread
 self.addEventListener('message', (event) => {
@@ -197,7 +224,17 @@ self.addEventListener('message', (event) => {
 // Background Periodic Sync Handler (Periodic Background Sync API)
 self.addEventListener('periodicsync' as any, (event: any) => {
   if (event.tag === 'check-due-notifications') {
-    event.waitUntil(checkAndFireNotifications());
+    event.waitUntil(
+      caches.open('tmd-sw-events-v1').then(async (cache) => {
+        const resp = await cache.match('/sw-scheduled-events.json');
+        if (resp) {
+          try {
+            storedEvents = await resp.json();
+          } catch (e) {}
+        }
+        await checkAndFireNotifications();
+      })
+    );
   }
 });
 
@@ -222,3 +259,4 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
+
