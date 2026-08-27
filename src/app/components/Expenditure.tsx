@@ -64,6 +64,15 @@ function formatLastUpdated(isoString?: string): string {
   }
 }
 
+export function sortExpenseItems(items?: ExpenseItem[]): ExpenseItem[] {
+  if (!items || !Array.isArray(items)) return [];
+  return [...items].sort((a, b) => {
+    const dateCompare = (b.date || '').localeCompare(a.date || '');
+    if (dateCompare !== 0) return dateCompare;
+    return (b.id || '').localeCompare(a.id || '');
+  });
+}
+
 interface Props {
   activePerson: Person;
   partner1Name: string;
@@ -325,6 +334,20 @@ export default function Expenditure({
     setTimeout(() => setShowSaved(false), 2000);
   };
 
+  // Debounced auto-save effect for daily expenses and categories
+  useEffect(() => {
+    if (!hasUnsavedExpenses && !hasUnsavedCategories) return;
+
+    const timer = setTimeout(() => {
+      saveExpenses();
+      saveCategories();
+      setShowSaved(true);
+      setTimeout(() => setShowSaved(false), 2000);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [hasUnsavedExpenses, hasUnsavedCategories, saveExpenses, saveCategories]);
+
   // Partner Filter
   const partnerExpenses = useMemo(() => {
     return expenses.filter((e) => e.person === activePerson);
@@ -470,11 +493,12 @@ export default function Expenditure({
     return list;
   }, [filteredExpenses, cardSortOption, getExpenseTotal]);
 
-  // Helper to get filtered items for an expense
+  // Helper to get filtered & date-ordered items for an expense
   const getExpenseFilteredItems = useCallback(
     (expense: Expense): ExpenseItem[] => {
       if (!expense.items) return [];
-      return expense.items.filter((item) => isDateMatchPeriod(item.date));
+      const filtered = expense.items.filter((item) => isDateMatchPeriod(item.date));
+      return sortExpenseItems(filtered);
     },
     [isDateMatchPeriod]
   );
@@ -721,7 +745,7 @@ export default function Expenditure({
     setExpenses(
       expenses.map((exp) => {
         if (exp.id === expenseId) {
-          const updatedItems = [...(exp.items || []), newItem];
+          const updatedItems = sortExpenseItems([...(exp.items || []), newItem]);
           const newTotal = updatedItems.reduce((sum, i) => sum + i.amount, 0);
           return {
             ...exp,
@@ -752,7 +776,7 @@ export default function Expenditure({
     setExpenses(
       expenses.map((exp) => {
         if (exp.id === expenseId) {
-          const updatedItems = (exp.items || []).filter((i) => i.id !== itemId);
+          const updatedItems = sortExpenseItems((exp.items || []).filter((i) => i.id !== itemId));
           const newTotal = updatedItems.reduce((sum, i) => sum + i.amount, 0);
           return {
             ...exp,
@@ -773,16 +797,18 @@ export default function Expenditure({
     setExpenses(
       expenses.map((exp) => {
         if (exp.id === editingItem.expenseId) {
-          const updatedItems = (exp.items || []).map((i) =>
-            i.id === editingItem.itemId
-              ? {
-                  ...i,
-                  date: editingItem.date,
-                  item: editingItem.item.trim(),
-                  amount: parseFloat(editingItem.amount) || 0,
-                  customValues: editingItem.customValues || {},
-                }
-              : i
+          const updatedItems = sortExpenseItems(
+            (exp.items || []).map((i) =>
+              i.id === editingItem.itemId
+                ? {
+                    ...i,
+                    date: editingItem.date,
+                    item: editingItem.item.trim(),
+                    amount: parseFloat(editingItem.amount) || 0,
+                    customValues: editingItem.customValues || {},
+                  }
+                : i
+            )
           );
           const newTotal = updatedItems.reduce((sum, i) => sum + i.amount, 0);
           return { ...exp, amount: newTotal, items: updatedItems, updatedAt: new Date().toISOString() };
@@ -889,20 +915,20 @@ export default function Expenditure({
           </button>
         </div>
 
-        {/* Save Button */}
+        {/* Auto Save Status & Button */}
         <button
           onClick={handleSave}
-          disabled={!hasUnsavedChanges}
+          disabled={!hasUnsavedChanges && !showSaved}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
             showSaved
               ? 'bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-800'
               : hasUnsavedChanges
                 ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed border border-transparent dark:border-gray-700'
+                : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-default border border-transparent dark:border-gray-700'
           }`}
         >
           <Save className="w-4 h-4" />
-          {showSaved ? 'Saved!' : hasUnsavedChanges ? 'Save Expenses' : 'All Saved'}
+          {showSaved ? 'Auto Saved!' : hasUnsavedChanges ? 'Auto Saving...' : 'Auto Saved ✓'}
         </button>
       </div>
 
@@ -2113,9 +2139,11 @@ export default function Expenditure({
                   </thead>
                   <tbody className="divide-y divide-gray-50 dark:divide-gray-700/60 text-gray-700 dark:text-gray-200 font-medium">
                     {(() => {
-                      const modalItems = showAllModalHistory
-                        ? activeDetailExpense.items || []
-                        : getExpenseFilteredItems(activeDetailExpense);
+                      const modalItems = sortExpenseItems(
+                        showAllModalHistory
+                          ? activeDetailExpense.items || []
+                          : getExpenseFilteredItems(activeDetailExpense)
+                      );
 
                       if (modalItems.length === 0) {
                         return (

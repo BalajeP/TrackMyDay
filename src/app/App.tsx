@@ -410,8 +410,8 @@ function SettingsModal({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border border-gray-100 dark:border-gray-700 h-[85vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/50 p-0 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white dark:bg-gray-800 rounded-none sm:rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden border-0 sm:border border-gray-100 dark:border-gray-700 h-screen sm:h-[85vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0 bg-white dark:bg-gray-800">
           <div className="flex items-center gap-2.5">
@@ -428,10 +428,41 @@ function SettingsModal({
           </button>
         </div>
 
-        {/* 2-Column Sidebar & Content Layout */}
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left Sidebar Column */}
-          <div className="w-64 border-r border-gray-100 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/50 p-3 space-y-1 flex-shrink-0 overflow-y-auto">
+        {/* Responsive Layout: horizontal tabs on mobile, sidebar on lg+ */}
+        <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
+          {/* Mobile: Horizontal scrollable tab bar */}
+          <div className="lg:hidden border-b border-gray-100 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/50 flex-shrink-0">
+            <div className="flex overflow-x-auto gap-1 p-2 no-scrollbar">
+              {sidebarItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeSettingsTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveSettingsTab(item.id)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all ${
+                      isActive
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200/60 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                    <span>{item.label}</span>
+                    {item.badge && (
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+                        isActive ? 'bg-white/20 text-white' : 'bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300'
+                      }`}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Desktop: Left Sidebar Column */}
+          <div className="hidden lg:flex flex-col w-64 border-r border-gray-100 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/50 p-3 space-y-1 flex-shrink-0 overflow-y-auto">
             <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider px-3 py-1.5">Settings Menu</p>
             {sidebarItems.map((item) => {
               const Icon = item.icon;
@@ -463,7 +494,7 @@ function SettingsModal({
           </div>
 
           {/* Right Main Content Area */}
-          <div className="flex-1 p-6 overflow-y-auto bg-white dark:bg-gray-800">
+          <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-white dark:bg-gray-800">
             {/* 1. ACCOUNT INFO SECTION */}
             {activeSettingsTab === 'account' && (
               <div className="space-y-6 max-w-xl">
@@ -1310,10 +1341,10 @@ export default function App() {
 
   const allTabs = [
     { id: 'activities' as Tab, label: t('activities', lang), icon: Activity },
-    { id: 'tracking' as Tab, label: t('tracking', lang), icon: ListChecks },
     { id: 'meals' as Tab, label: t('meals', lang), icon: Utensils },
-    { id: 'workout' as Tab, label: t('workout', lang), icon: Dumbbell },
     { id: 'expenses' as Tab, label: t('expenses', lang), icon: DollarSign },
+    { id: 'tracking' as Tab, label: t('tracking', lang), icon: ListChecks },
+    { id: 'workout' as Tab, label: t('workout', lang), icon: Dumbbell },
     { id: 'calendar' as Tab, label: t('calendar', lang), icon: Calendar },
   ];
 

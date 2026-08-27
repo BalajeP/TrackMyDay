@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
 import { createPortal } from 'react-dom';
-import { Check, Pencil, UtensilsCrossed, Plus, X, ChevronDown, ChevronLeft, ChevronRight, List, Trash2, Save, Search } from 'lucide-react';
+import { Check, Pencil, UtensilsCrossed, Plus, X, ChevronDown, ChevronLeft, ChevronRight, List, Trash2, Save, Search, FileText, Printer } from 'lucide-react';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isToday } from 'date-fns';
 
 type Person = 'partner1' | 'partner2' | 'both';
@@ -457,6 +457,7 @@ export default function MealSchedule({ activePerson, partner1Name, partner2Name,
   const [plan, setPlan, savePlan, hasUnsavedPlan] = useSupabasePersistedState<WeekPlan>('meals_plan', {}, {}, accessToken);
   const [optionsByMeal, setOptionsByMeal, saveOptions, hasUnsavedOptions] = useSupabasePersistedState<OptionsByMeal>('meals_options', EMPTY_OPTIONS, EMPTY_OPTIONS, accessToken);
   const [showSaved, setShowSaved] = useState(false);
+  const [showPdfPreviewModal, setShowPdfPreviewModal] = useState<boolean>(false);
 
   const hasUnsavedChanges = hasUnsavedPlan || hasUnsavedOptions;
 
@@ -467,6 +468,34 @@ export default function MealSchedule({ activePerson, partner1Name, partner2Name,
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const weekLabel = `${format(weekStart, 'MMM d')} – ${format(addDays(weekStart, 6), 'MMM d, yyyy')}`;
 
+  const getEntry = useCallback(
+    (dateStr: string, meal: MealType) => plan[dateStr]?.[meal] ?? emptyEntry(),
+    [plan]
+  );
+
+  // Compute Weekly Meal Stats for Report
+  const weekStats = useMemo(() => {
+    let totalPlanned = 0;
+    let totalCooked = 0;
+    let totalChanged = 0;
+    let totalAteOut = 0;
+
+    weekDays.forEach((day) => {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      MEAL_COLUMNS.forEach((col) => {
+        const entry = getEntry(dateStr, col.key);
+        if (entry.planned || entry.actual) {
+          totalPlanned++;
+          if (entry.status === 'cooked') totalCooked++;
+          else if (entry.status === 'changed') totalChanged++;
+          else if (entry.status === 'ate-out') totalAteOut++;
+        }
+      });
+    });
+
+    return { totalPlanned, totalCooked, totalChanged, totalAteOut };
+  }, [weekDays, getEntry]);
+
   const handleSave = () => {
     savePlan();
     saveOptions();
@@ -474,7 +503,6 @@ export default function MealSchedule({ activePerson, partner1Name, partner2Name,
     setTimeout(() => setShowSaved(false), 2000);
   };
 
-  const getEntry = (dateStr: string, meal: MealType) => plan[dateStr]?.[meal] ?? emptyEntry();
   const setEntry = (dateStr: string, meal: MealType, entry: MealEntry) =>
     setPlan((prev) => ({ ...prev, [dateStr]: { ...(prev[dateStr] ?? emptyDay()), [meal]: entry } }));
 
@@ -489,9 +517,16 @@ export default function MealSchedule({ activePerson, partner1Name, partner2Name,
 
   return (
     <div className="space-y-4">
-      {/* Header with Save */}
-      <div className="flex items-center justify-between">
-        <div />
+      {/* Header with Export PDF Report & Save */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => setShowPdfPreviewModal(true)}
+          className="flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-sm transition-all"
+        >
+          <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          <span>Export PDF Report</span>
+        </button>
+
         <button
           onClick={handleSave}
           disabled={!hasUnsavedChanges}
@@ -598,6 +633,139 @@ export default function MealSchedule({ activePerson, partner1Name, partner2Name,
           </table>
         </div>
       </div>
+
+      {/* PDF Report Export Modal */}
+      {showPdfPreviewModal && (
+        <div className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-md flex flex-col items-center justify-start p-4 overflow-y-auto print:p-0 print:bg-white print:static">
+          {/* Action Control Bar (Hidden when printing) */}
+          <div className="w-full max-w-5xl bg-gray-900 text-white rounded-2xl p-4 mb-4 flex items-center justify-between shadow-2xl print:hidden sticky top-2 z-50">
+            <div className="flex items-center gap-3">
+              <FileText className="w-5 h-5 text-indigo-400" />
+              <div>
+                <h3 className="font-semibold text-sm text-white">Meal Schedule Report Preview</h3>
+                <p className="text-xs text-gray-400">{weekLabel}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-medium transition-colors shadow-lg shadow-indigo-600/30"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Print / Save as PDF</span>
+              </button>
+              <button
+                onClick={() => setShowPdfPreviewModal(false)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-xl transition-colors"
+                title="Close preview"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Printable Document Body */}
+          <div className="w-full max-w-5xl bg-white rounded-2xl border border-gray-200 p-8 shadow-2xl space-y-6 print:shadow-none print:border-none print:p-0 print:w-full text-gray-900">
+            {/* Report Document Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 pb-6">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Weekly Meal Schedule & Nutrition Report</h1>
+                <p className="text-sm font-medium text-gray-500 mt-1">Week of: <span className="text-gray-900 font-semibold">{weekLabel}</span></p>
+                <p className="text-xs text-gray-400 mt-0.5">Profile: {activePerson === 'partner1' ? partner1Name : activePerson === 'partner2' ? partner2Name : 'Both Partners'}</p>
+              </div>
+              <div className="text-right">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-200">
+                  TrackMyDay Report
+                </span>
+                <p className="text-xs text-gray-400 mt-2">Generated on {format(new Date(), 'MMM d, yyyy')}</p>
+              </div>
+            </div>
+
+            {/* Weekly Summary Cards */}
+            <div className="grid grid-cols-4 gap-4">
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 text-center">
+                <span className="block text-2xl font-bold text-gray-800">{weekStats.totalPlanned}</span>
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Items</span>
+              </div>
+              <div className="bg-green-50 p-4 rounded-xl border border-green-200 text-center">
+                <span className="block text-2xl font-bold text-green-700">{weekStats.totalCooked}</span>
+                <span className="text-xs font-medium text-green-600 uppercase tracking-wider">Home Cooked</span>
+              </div>
+              <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-center">
+                <span className="block text-2xl font-bold text-amber-700">{weekStats.totalChanged}</span>
+                <span className="text-xs font-medium text-amber-600 uppercase tracking-wider">Changed Meals</span>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-xl border border-purple-200 text-center">
+                <span className="block text-2xl font-bold text-purple-700">{weekStats.totalAteOut}</span>
+                <span className="text-xs font-medium text-purple-600 uppercase tracking-wider">Ate Out</span>
+              </div>
+            </div>
+
+            {/* Report Table */}
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-gray-100 text-gray-700 font-semibold border-b border-gray-200 uppercase tracking-wider">
+                  <tr>
+                    <th className="p-3 border-r border-gray-200 w-28">Day</th>
+                    {MEAL_COLUMNS.map((col) => (
+                      <th key={col.key} className="p-3 border-r border-gray-200 last:border-r-0">{col.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 text-gray-800">
+                  {weekDays.map((day) => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    return (
+                      <tr key={dateStr} className="hover:bg-gray-50/50">
+                        <td className="p-3 font-semibold border-r border-gray-200 bg-gray-50/50">
+                          <div>{format(day, 'EEEE')}</div>
+                          <div className="text-[11px] text-gray-500 font-normal">{format(day, 'MMM d')}</div>
+                        </td>
+                        {MEAL_COLUMNS.map((col) => {
+                          const entry = getEntry(dateStr, col.key);
+                          const hasContent = entry.planned || entry.actual;
+                          return (
+                            <td key={col.key} className="p-2.5 border-r border-gray-200 last:border-r-0 align-top">
+                              {hasContent ? (
+                                <div className="space-y-1">
+                                  <div className="font-medium text-gray-900">{entry.planned || '—'}</div>
+                                  {entry.status === 'cooked' && (
+                                    <span className="inline-block px-1.5 py-0.5 text-[10px] bg-green-100 text-green-800 rounded font-semibold border border-green-200">
+                                      ✓ Cooked
+                                    </span>
+                                  )}
+                                  {entry.status === 'changed' && (
+                                    <div className="text-[10px] bg-amber-50 text-amber-800 p-1 rounded border border-amber-200">
+                                      <span className="font-semibold">Actual:</span> {entry.actual || 'Changed'}
+                                    </div>
+                                  )}
+                                  {entry.status === 'ate-out' && (
+                                    <div className="text-[10px] bg-purple-50 text-purple-800 p-1 rounded border border-purple-200">
+                                      <span className="font-semibold">Ate Out:</span> {entry.actual || 'Restaurant'}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-gray-300 font-normal">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer */}
+            <div className="pt-4 border-t border-gray-200 flex items-center justify-between text-xs text-gray-400">
+              <p>TrackMyDay Meal Schedule Export</p>
+              <p>Page 1 of 1</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
