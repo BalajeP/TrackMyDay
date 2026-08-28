@@ -420,19 +420,22 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
   };
 
   const deleteColumn = (tripId: string, columnId: string) => {
-    setState((prev) => ({
-      ...prev,
-      trips: activeState.trips.map((t) => {
-        if (t.id !== tripId) return t;
-        const updatedColumns = t.columns.filter((col) => col.id !== columnId);
-        const updatedEntries = t.entries.map((entry) => {
-          const newData = { ...entry.data };
-          delete newData[columnId];
-          return { ...entry, data: newData };
-        });
-        return { ...t, columns: updatedColumns, entries: updatedEntries, updatedAt: new Date().toISOString() };
-      })
-    }));
+    setState((prev) => {
+      const currentTrips = (prev && Array.isArray(prev.trips)) ? prev.trips : activeState.trips;
+      return {
+        ...prev,
+        trips: currentTrips.map((t) => {
+          if (t.id !== tripId) return t;
+          const updatedColumns = (t.columns || []).filter((col) => col.id !== columnId);
+          const updatedEntries = (t.entries || []).map((entry) => {
+            const newData = { ...(entry.data || {}) };
+            delete newData[columnId];
+            return { ...entry, data: newData };
+          });
+          return { ...t, columns: updatedColumns, entries: updatedEntries, updatedAt: new Date().toISOString() };
+        })
+      };
+    });
     setConfirmDelete(null);
   };
 
@@ -805,7 +808,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
   };
 
   const isCoreColumn = (colId: string) => {
-    return ['date', 'expense_for', 'total_amount', 'spender'].includes(colId);
+    return colId === 'date';
   };
 
   const visibleTrips = useMemo(() => {
