@@ -1,3 +1,4 @@
+// Trip Expense Component with Timing Column support
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
 import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical, Zap, UserX, UserCheck, Clock } from 'lucide-react';
@@ -9,7 +10,7 @@ type Person = 'partner1' | 'partner2' | 'both';
 export interface TripColumn {
   id: string;
   name: string;
-  type: 'date' | 'text' | 'number' | 'split';
+  type: 'date' | 'text' | 'number' | 'split' | 'time';
 }
 
 export interface TripEntry {
@@ -88,26 +89,29 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
   // Tracking rotating/spinning state of refresh icons per trip: tripId -> boolean
   const [spinningTrip, setSpinningTrip] = useState<Record<string, boolean>>({});
 
-  const [splitPopover, setSplitPopover] = useState<{
+  // Cell timing popover state
+  const [cellTimePopover, setCellTimePopover] = useState<{
     tripId: string;
     entryId: string;
-    mode: 'all' | 'exclude' | 'include';
-    selectedCols: string[];
+    colId: string;
+    mode: 'range' | 'single';
+    fromH: string; fromM: string; fromAP: 'AM' | 'PM';
+    toH: string; toM: string; toAP: 'AM' | 'PM';
+    singleH: string; singleM: string; singleAP: 'AM' | 'PM';
   } | null>(null);
+  const cellTimePopoverRef = useRef<HTMLDivElement>(null);
 
-  const splitPopoverRef = useRef<HTMLDivElement>(null);
-
-  // Close split popover on outside click
+  // Close cell time popover on outside click
   useEffect(() => {
-    if (!splitPopover) return;
+    if (!cellTimePopover) return;
     const handler = (e: MouseEvent) => {
-      if (splitPopoverRef.current && !splitPopoverRef.current.contains(e.target as Node)) {
-        setSplitPopover(null);
+      if (cellTimePopoverRef.current && !cellTimePopoverRef.current.contains(e.target as Node)) {
+        setCellTimePopover(null);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [splitPopover]);
+  }, [cellTimePopover]);
 
   // Perform Split Equally across all split columns
   const applySplitEquallyAll = (tripId: string, entryId: string) => {
@@ -347,62 +351,47 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
       type: 'text'
     };
 
-    setState((prev) => ({
-      ...prev,
-      trips: activeState.trips.map((t) => {
-        if (t.id !== tripId) return t;
-        const updatedColumns = [...t.columns, newCol];
-        const updatedEntries = t.entries.map((entry) => ({
-          ...entry,
-          data: { ...entry.data, [newColId]: '' }
-        }));
-        return { ...t, columns: updatedColumns, entries: updatedEntries, updatedAt: new Date().toISOString() };
-      })
-    }));
+    setState((prev) => {
+      const currentTrips = (prev && Array.isArray(prev.trips)) ? prev.trips : activeState.trips;
+      return {
+        ...prev,
+        trips: currentTrips.map((t) => {
+          if (t.id !== tripId) return t;
+          const updatedColumns = [...(t.columns || []), newCol];
+          const updatedEntries = (t.entries || []).map((entry) => ({
+            ...entry,
+            data: { ...(entry.data || {}), [newColId]: '' }
+          }));
+          return { ...t, columns: updatedColumns, entries: updatedEntries, updatedAt: new Date().toISOString() };
+        })
+      };
+    });
   };
 
-  const handleAddSplitColumn = (tripId: string) => {
+  const handleAddTimingColumn = (tripId: string) => {
     setShowAddColMenu(null);
-    const targetTrip = activeState.trips.find((t) => t.id === tripId);
-    if (!targetTrip) return;
+    const newColId = `time_${Date.now()}`;
+    const newCol: TripColumn = {
+      id: newColId,
+      name: 'Timing',
+      type: 'time'
+    };
 
-    const splitCols = targetTrip.columns.filter((c) => c.type === 'split');
-
-    setState((prev) => ({
-      ...prev,
-      trips: activeState.trips.map((t) => {
-        if (t.id !== tripId) return t;
-
-        let updatedColumns = [...t.columns];
-        let updatedEntries = [...t.entries];
-
-        if (splitCols.length === 0) {
-          // Initialize with Split Mem 1 and Split Mem 2 on first click
-          const col1: TripColumn = { id: `split_${Date.now()}_1`, name: 'Split Mem 1', type: 'split' };
-          const col2: TripColumn = { id: `split_${Date.now()}_2`, name: 'Split Mem 2', type: 'split' };
-          updatedColumns.push(col1, col2);
-          updatedEntries = updatedEntries.map((e) => ({
-            ...e,
-            data: { ...e.data, [col1.id]: '', [col2.id]: '' }
+    setState((prev) => {
+      const currentTrips = (prev && Array.isArray(prev.trips)) ? prev.trips : activeState.trips;
+      return {
+        ...prev,
+        trips: currentTrips.map((t) => {
+          if (t.id !== tripId) return t;
+          const updatedColumns = [...(t.columns || []), newCol];
+          const updatedEntries = (t.entries || []).map((entry) => ({
+            ...entry,
+            data: { ...(entry.data || {}), [newColId]: '' }
           }));
-        } else {
-          // Incremental additions
-          const nextIndex = splitCols.length + 1;
-          const newCol: TripColumn = {
-            id: `split_${Date.now()}`,
-            name: `Split Mem ${nextIndex}`,
-            type: 'split'
-          };
-          updatedColumns.push(newCol);
-          updatedEntries = updatedEntries.map((e) => ({
-            ...e,
-            data: { ...e.data, [newCol.id]: '' }
-          }));
-        }
-
-        return { ...t, columns: updatedColumns, entries: updatedEntries, updatedAt: new Date().toISOString() };
-      })
-    }));
+          return { ...t, columns: updatedColumns, entries: updatedEntries, updatedAt: new Date().toISOString() };
+        })
+      };
+    });
   };
 
   const startEditingColumn = (tripId: string, columnId: string, name: string) => {
@@ -455,7 +444,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     const newId = `entry_${Date.now()}`;
     const defaultData: Record<string, string> = {};
 
-    targetTrip.columns.forEach((col) => {
+    (targetTrip.columns || []).forEach((col) => {
       if (col.type === 'date') {
         defaultData[col.id] = format(new Date(), 'yyyy-MM-dd');
       } else {
@@ -469,12 +458,15 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
       person: activePerson
     };
 
-    setState((prev) => ({
-      ...prev,
-      trips: activeState.trips.map((t) =>
-        t.id === tripId ? { ...t, entries: [newEntry, ...t.entries], updatedAt: new Date().toISOString() } : t
-      )
-    }));
+    setState((prev) => {
+      const currentTrips = (prev && Array.isArray(prev.trips)) ? prev.trips : activeState.trips;
+      return {
+        ...prev,
+        trips: currentTrips.map((t) =>
+          t.id === tripId ? { ...t, entries: [newEntry, ...(t.entries || [])], updatedAt: new Date().toISOString() } : t
+        )
+      };
+    });
 
     // Start row in edit mode
     setEditBuffers((prev) => ({
@@ -484,10 +476,13 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
         [newId]: defaultData
       }
     }));
-    setEditingEntries((prev) => ({
-      ...prev,
-      [tripId]: new Set(prev[tripId] || []).add(newId)
-    }));
+    setEditingEntries((prev) => {
+      const existing = prev[tripId] instanceof Set ? Array.from(prev[tripId]) : Array.isArray(prev[tripId]) ? prev[tripId] : [];
+      return {
+        ...prev,
+        [tripId]: new Set([...existing, newId])
+      };
+    });
   };
 
   const startEditEntry = (tripId: string, entryId: string, currentData: Record<string, string>) => {
@@ -495,13 +490,16 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
       ...prev,
       [tripId]: {
         ...(prev[tripId] || {}),
-        [entryId]: { ...currentData }
+        [entryId]: { ...(currentData || {}) }
       }
     }));
-    setEditingEntries((prev) => ({
-      ...prev,
-      [tripId]: new Set(prev[tripId] || []).add(entryId)
-    }));
+    setEditingEntries((prev) => {
+      const existing = prev[tripId] instanceof Set ? Array.from(prev[tripId]) : Array.isArray(prev[tripId]) ? prev[tripId] : [];
+      return {
+        ...prev,
+        [tripId]: new Set([...existing, entryId])
+      };
+    });
   };
 
   const updateBufferValue = (tripId: string, entryId: string, columnId: string, value: string) => {
@@ -549,22 +547,25 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     const buffer = editBuffers[tripId]?.[entryId];
     if (!buffer) return;
 
-    setState((prev) => ({
-      ...prev,
-      trips: activeState.trips.map((t) => {
-        if (t.id !== tripId) return t;
-        return {
-          ...t,
-          entries: t.entries.map((e) => (e.id === entryId ? { ...e, data: buffer } : e)),
-          updatedAt: new Date().toISOString(),
-        };
-      })
-    }));
+    setState((prev) => {
+      const currentTrips = (prev && Array.isArray(prev.trips)) ? prev.trips : activeState.trips;
+      return {
+        ...prev,
+        trips: currentTrips.map((t) => {
+          if (t.id !== tripId) return t;
+          return {
+            ...t,
+            entries: (t.entries || []).map((e) => (e.id === entryId ? { ...e, data: buffer } : e)),
+            updatedAt: new Date().toISOString(),
+          };
+        })
+      };
+    });
 
     setEditingEntries((prev) => {
-      const nextSet = new Set(prev[tripId] || []);
-      nextSet.delete(entryId);
-      return { ...prev, [tripId]: nextSet };
+      const existing = prev[tripId] instanceof Set ? new Set(prev[tripId]) : new Set<string>();
+      existing.delete(entryId);
+      return { ...prev, [tripId]: existing };
     });
 
     setEditBuffers((prev) => {
@@ -579,24 +580,27 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     const originalEntry = targetTrip?.entries.find((e) => e.id === entryId);
 
     // If new and saved data was empty, remove row on cancel
-    const isNewAndEmpty = originalEntry && Object.values(originalEntry.data).every(
+    const isNewAndEmpty = originalEntry && Object.values(originalEntry.data || {}).every(
       (val) => val === '' || val === format(new Date(), 'yyyy-MM-dd')
     );
 
     if (isNewAndEmpty) {
-      setState((prev) => ({
-        ...prev,
-        trips: activeState.trips.map((t) => {
-          if (t.id !== tripId) return t;
-          return { ...t, entries: t.entries.filter((e) => e.id !== entryId) };
-        })
-      }));
+      setState((prev) => {
+        const currentTrips = (prev && Array.isArray(prev.trips)) ? prev.trips : activeState.trips;
+        return {
+          ...prev,
+          trips: currentTrips.map((t) => {
+            if (t.id !== tripId) return t;
+            return { ...t, entries: (t.entries || []).filter((e) => e.id !== entryId) };
+          })
+        };
+      });
     }
 
     setEditingEntries((prev) => {
-      const nextSet = new Set(prev[tripId] || []);
-      nextSet.delete(entryId);
-      return { ...prev, [tripId]: nextSet };
+      const existing = prev[tripId] instanceof Set ? new Set(prev[tripId]) : new Set<string>();
+      existing.delete(entryId);
+      return { ...prev, [tripId]: existing };
     });
 
     setEditBuffers((prev) => {
@@ -991,7 +995,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                           </button>
                         </div>
 
-                        {/* Add Row & Column */}
+                        {/* Add Row & Column & Add Timing */}
                         <button
                           onClick={() => handleAddEntry(trip.id)}
                           className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer shadow-sm animate-in fade-in"
@@ -1018,14 +1022,27 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                 Normal Column
                               </button>
                               <button
-                                onClick={() => handleAddSplitColumn(trip.id)}
-                                className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors border-t border-gray-100 dark:border-gray-700 cursor-pointer"
+                                disabled={!(trip.entries && trip.entries.length > 0)}
+                                onClick={() => handleAddTimingColumn(trip.id)}
+                                className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-violet-600 dark:hover:text-violet-400 transition-colors border-t border-gray-100 dark:border-gray-700 cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                                title={trip.entries && trip.entries.length > 0 ? "Add Timing Column" : "Add at least one row first to enable Time Planner"}
                               >
-                                Split Member Column
+                                <Clock className="w-3.5 h-3.5 text-violet-500" />
+                                Timing Column
                               </button>
                             </div>
                           )}
                         </div>
+
+                        <button
+                          disabled={!(trip.entries && trip.entries.length > 0)}
+                          onClick={() => handleAddTimingColumn(trip.id)}
+                          className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer shadow-sm animate-in fade-in transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-violet-600"
+                          title={trip.entries && trip.entries.length > 0 ? "Add Timing Column" : "Add at least one row first to enable Time Planner"}
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          Add Timing
+                        </button>
 
                         {/* Delete Trip */}
                         <button
@@ -1227,6 +1244,237 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                     className="w-full pl-5 pr-1.5 py-1.5 border border-indigo-200 dark:border-indigo-700 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                                   />
                                                 </div>
+                                              ) : col.type === 'time' ? (
+                                                <div className="relative min-w-[140px]">
+                                                  <input
+                                                    type="text"
+                                                    placeholder="09:00 AM – 10:30 AM"
+                                                    value={value}
+                                                    onChange={(e) =>
+                                                      updateBufferValue(trip.id, entry.id, col.id, e.target.value)
+                                                    }
+                                                    className="w-full pl-2 pr-7 py-1.5 border border-violet-300 dark:border-violet-700 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-400 font-mono"
+                                                  />
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setCellTimePopover(
+                                                        cellTimePopover?.tripId === trip.id && cellTimePopover?.entryId === entry.id && cellTimePopover?.colId === col.id
+                                                          ? null
+                                                          : {
+                                                              tripId: trip.id,
+                                                              entryId: entry.id,
+                                                              colId: col.id,
+                                                              mode: 'range',
+                                                              fromH: '09', fromM: '00', fromAP: 'AM',
+                                                              toH: '10', toM: '00', toAP: 'AM',
+                                                              singleH: '09', singleM: '00', singleAP: 'AM'
+                                                            }
+                                                      );
+                                                    }}
+                                                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/50 rounded transition-colors"
+                                                    title="Timing Picker (Range / Single)"
+                                                  >
+                                                    <Clock className="w-3.5 h-3.5" />
+                                                  </button>
+
+                                                  {cellTimePopover?.tripId === trip.id && cellTimePopover?.entryId === entry.id && cellTimePopover?.colId === col.id && (
+                                                    <div
+                                                      ref={cellTimePopoverRef}
+                                                      onClick={(e) => e.stopPropagation()}
+                                                      className="absolute left-0 top-full mt-1.5 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-violet-200 dark:border-violet-700 p-3.5 w-72 text-left animate-in fade-in duration-100"
+                                                    >
+                                                      <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-2 mb-2.5">
+                                                        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-gray-100">
+                                                          <Clock className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                                                          <span>Select Timing</span>
+                                                        </div>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => setCellTimePopover(null)}
+                                                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-0.5 rounded"
+                                                        >
+                                                          <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                      </div>
+
+                                                      <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700/60 p-0.5 mb-3 text-[10px] font-bold">
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => setCellTimePopover((p) => p ? { ...p, mode: 'range' } : null)}
+                                                          className={`flex-1 py-1 rounded-md transition-colors text-center ${
+                                                            cellTimePopover.mode === 'range'
+                                                              ? 'bg-violet-600 text-white shadow-2xs font-bold'
+                                                              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                                                          }`}
+                                                        >
+                                                          1. From – To AM/PM
+                                                        </button>
+                                                        <button
+                                                          type="button"
+                                                          onClick={() => setCellTimePopover((p) => p ? { ...p, mode: 'single' } : null)}
+                                                          className={`flex-1 py-1 rounded-md transition-colors text-center ${
+                                                            cellTimePopover.mode === 'single'
+                                                              ? 'bg-violet-600 text-white shadow-2xs font-bold'
+                                                              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                                                          }`}
+                                                        >
+                                                          2. Single Time
+                                                        </button>
+                                                      </div>
+
+                                                      {cellTimePopover.mode === 'range' ? (
+                                                        <div className="space-y-2">
+                                                          <div className="flex items-center gap-1">
+                                                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 w-8">From</span>
+                                                            <select
+                                                              value={cellTimePopover.fromH}
+                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, fromH: e.target.value } : null)}
+                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                                            >
+                                                              {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                              ))}
+                                                            </select>
+                                                            <span className="text-gray-400 text-xs">:</span>
+                                                            <select
+                                                              value={cellTimePopover.fromM}
+                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, fromM: e.target.value } : null)}
+                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                                            >
+                                                              {['00', '15', '30', '45'].map((m) => (
+                                                                <option key={m} value={m}>{m}</option>
+                                                              ))}
+                                                            </select>
+                                                            <div className="flex rounded border border-violet-200 dark:border-violet-700 overflow-hidden">
+                                                              {(['AM', 'PM'] as const).map((ap) => (
+                                                                <button
+                                                                  key={ap}
+                                                                  type="button"
+                                                                  onClick={() => setCellTimePopover((p) => p ? { ...p, fromAP: ap } : null)}
+                                                                  className={`px-1.5 py-1 text-[10px] font-bold ${
+                                                                    cellTimePopover.fromAP === ap ? 'bg-violet-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-500'
+                                                                  }`}
+                                                                >
+                                                                  {ap}
+                                                                </button>
+                                                              ))}
+                                                            </div>
+                                                          </div>
+
+                                                          <div className="flex items-center gap-1">
+                                                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 w-8">To</span>
+                                                            <select
+                                                              value={cellTimePopover.toH}
+                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, toH: e.target.value } : null)}
+                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                                            >
+                                                              {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                              ))}
+                                                            </select>
+                                                            <span className="text-gray-400 text-xs">:</span>
+                                                            <select
+                                                              value={cellTimePopover.toM}
+                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, toM: e.target.value } : null)}
+                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                                            >
+                                                              {['00', '15', '30', '45'].map((m) => (
+                                                                <option key={m} value={m}>{m}</option>
+                                                              ))}
+                                                            </select>
+                                                            <div className="flex rounded border border-violet-200 dark:border-violet-700 overflow-hidden">
+                                                              {(['AM', 'PM'] as const).map((ap) => (
+                                                                <button
+                                                                  key={ap}
+                                                                  type="button"
+                                                                  onClick={() => setCellTimePopover((p) => p ? { ...p, toAP: ap } : null)}
+                                                                  className={`px-1.5 py-1 text-[10px] font-bold ${
+                                                                    cellTimePopover.toAP === ap ? 'bg-violet-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-500'
+                                                                  }`}
+                                                                >
+                                                                  {ap}
+                                                                </button>
+                                                              ))}
+                                                            </div>
+                                                          </div>
+
+                                                          <div className="text-[10px] font-mono text-center text-violet-600 dark:text-violet-400 py-1 font-semibold bg-violet-50 dark:bg-violet-950/40 rounded">
+                                                            {cellTimePopover.fromH}:{cellTimePopover.fromM} {cellTimePopover.fromAP} – {cellTimePopover.toH}:{cellTimePopover.toM} {cellTimePopover.toAP}
+                                                          </div>
+
+                                                          <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                              const formattedTime = `${cellTimePopover.fromH}:${cellTimePopover.fromM} ${cellTimePopover.fromAP} – ${cellTimePopover.toH}:${cellTimePopover.toM} ${cellTimePopover.toAP}`;
+                                                              updateBufferValue(trip.id, entry.id, col.id, formattedTime);
+                                                              setCellTimePopover(null);
+                                                            }}
+                                                            className="w-full py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1"
+                                                          >
+                                                            Set Timing Range
+                                                          </button>
+                                                        </div>
+                                                      ) : (
+                                                        <div className="space-y-2">
+                                                          <div className="flex items-center gap-1">
+                                                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 w-8">Time</span>
+                                                            <select
+                                                              value={cellTimePopover.singleH}
+                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, singleH: e.target.value } : null)}
+                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                                            >
+                                                              {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                              ))}
+                                                            </select>
+                                                            <span className="text-gray-400 text-xs">:</span>
+                                                            <select
+                                                              value={cellTimePopover.singleM}
+                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, singleM: e.target.value } : null)}
+                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                                            >
+                                                              {['00', '15', '30', '45'].map((m) => (
+                                                                <option key={m} value={m}>{m}</option>
+                                                              ))}
+                                                            </select>
+                                                            <div className="flex rounded border border-violet-200 dark:border-violet-700 overflow-hidden">
+                                                              {(['AM', 'PM'] as const).map((ap) => (
+                                                                <button
+                                                                  key={ap}
+                                                                  type="button"
+                                                                  onClick={() => setCellTimePopover((p) => p ? { ...p, singleAP: ap } : null)}
+                                                                  className={`px-1.5 py-1 text-[10px] font-bold ${
+                                                                    cellTimePopover.singleAP === ap ? 'bg-violet-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-500'
+                                                                  }`}
+                                                                >
+                                                                  {ap}
+                                                                </button>
+                                                              ))}
+                                                            </div>
+                                                          </div>
+
+                                                          <div className="text-[10px] font-mono text-center text-violet-600 dark:text-violet-400 py-1 font-semibold bg-violet-50 dark:bg-violet-950/40 rounded">
+                                                            {cellTimePopover.singleH}:{cellTimePopover.singleM} {cellTimePopover.singleAP}
+                                                          </div>
+
+                                                          <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                              const formattedTime = `${cellTimePopover.singleH}:${cellTimePopover.singleM} ${cellTimePopover.singleAP}`;
+                                                              updateBufferValue(trip.id, entry.id, col.id, formattedTime);
+                                                              setCellTimePopover(null);
+                                                            }}
+                                                            className="w-full py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1"
+                                                          >
+                                                            Set Single Timing
+                                                          </button>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  )}
+                                                </div>
                                               ) : (
                                                 <input
                                                   type="text"
@@ -1244,6 +1492,15 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                 formatDateSafe(value)
                                               ) : col.type === 'number' || col.type === 'split' ? (
                                                 value ? `$${parseFloat(value).toFixed(2)}` : '$0.00'
+                                              ) : col.type === 'time' ? (
+                                                value ? (
+                                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 font-medium text-xs border border-violet-100 dark:border-violet-800/60 font-mono">
+                                                    <Clock className="w-3 h-3 text-violet-500 dark:text-violet-400 flex-shrink-0" />
+                                                    <span>{value}</span>
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-gray-300 dark:text-gray-600 italic">—</span>
+                                                )
                                               ) : (
                                                 value || <span className="text-gray-300 dark:text-gray-600 italic">—</span>
                                               )}

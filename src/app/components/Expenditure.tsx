@@ -242,6 +242,8 @@ export default function Expenditure({
     null
   );
 
+
+
   // Show Add Entry Form state for Modal View
   const [showAddEntryModal, setShowAddEntryModal] = useState<boolean>(false);
 
@@ -1848,6 +1850,7 @@ export default function Expenditure({
                     setSelectedExpenseDetailId(null);
                     setShowAddColumnModal(false);
                     setShowAddEntryModal(false);
+                    setShowTimePlannerModal(false);
                     setConfirmCardDeleteInModal(false);
                   }}
                   className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -1920,6 +1923,8 @@ export default function Expenditure({
                 </button>
               </div>
             )}
+
+
 
             {/* Add New Entry Drawer */}
             {showAddEntryModal && (
