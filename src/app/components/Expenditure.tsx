@@ -21,6 +21,8 @@ import {
   Download,
   GripVertical,
   Clock,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
@@ -64,10 +66,12 @@ function formatLastUpdated(isoString?: string): string {
   }
 }
 
-export function sortExpenseItems(items?: ExpenseItem[]): ExpenseItem[] {
+export function sortExpenseItems(items?: ExpenseItem[], order: 'asc' | 'desc' = 'desc'): ExpenseItem[] {
   if (!items || !Array.isArray(items)) return [];
   return [...items].sort((a, b) => {
-    const dateCompare = (b.date || '').localeCompare(a.date || '');
+    const dateA = a.date || '';
+    const dateB = b.date || '';
+    const dateCompare = order === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA);
     if (dateCompare !== 0) return dateCompare;
     return (b.id || '').localeCompare(a.id || '');
   });
@@ -271,6 +275,20 @@ export default function Expenditure({
 
   // Expense Card Sorting State (a-z, z-a, amount-desc, amount-asc, custom)
   const [cardSortOption, setCardSortOption] = useState<CardSortOption>('custom');
+
+  // Individual Category Date Sort Order State ('asc' | 'desc')
+  const [categoryDateSortOrder, setCategoryDateSortOrder] = useState<Record<string, 'asc' | 'desc'>>({});
+
+  const getCategorySortOrder = (categoryId: string): 'asc' | 'desc' => {
+    return categoryDateSortOrder[categoryId] || 'desc';
+  };
+
+  const toggleCategoryDateSortOrder = (categoryId: string) => {
+    setCategoryDateSortOrder((prev) => ({
+      ...prev,
+      [categoryId]: (prev[categoryId] || 'desc') === 'desc' ? 'asc' : 'desc',
+    }));
+  };
 
   // Expense Card Title & Icon Editing State
   const [editingExpense, setEditingExpense] = useState<{
@@ -2054,7 +2072,21 @@ export default function Expenditure({
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-gray-100 dark:border-gray-700 text-gray-400 dark:text-gray-400 font-semibold">
-                      <th className="py-2.5 px-3">Date</th>
+                      <th className="py-2.5 px-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleCategoryDateSortOrder(activeDetailExpense.id)}
+                          className="flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer select-none"
+                          title={`Date Order: ${getCategorySortOrder(activeDetailExpense.id) === 'desc' ? 'Descending (Click to sort Ascending)' : 'Ascending (Click to sort Descending)'}`}
+                        >
+                          <span>Date</span>
+                          {getCategorySortOrder(activeDetailExpense.id) === 'desc' ? (
+                            <ArrowDown className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          ) : (
+                            <ArrowUp className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          )}
+                        </button>
+                      </th>
                       <th className="py-2.5 px-3">Detail</th>
 
                       {/* Dynamic Custom Column Headers */}
@@ -2144,10 +2176,12 @@ export default function Expenditure({
                   </thead>
                   <tbody className="divide-y divide-gray-50 dark:divide-gray-700/60 text-gray-700 dark:text-gray-200 font-medium">
                     {(() => {
+                      const modalSortOrder = getCategorySortOrder(activeDetailExpense.id);
                       const modalItems = sortExpenseItems(
                         showAllModalHistory
                           ? activeDetailExpense.items || []
-                          : getExpenseFilteredItems(activeDetailExpense)
+                          : getExpenseFilteredItems(activeDetailExpense),
+                        modalSortOrder
                       );
 
                       if (modalItems.length === 0) {
@@ -2487,7 +2521,8 @@ export default function Expenditure({
                 </p>
               ) : (
                 filteredExpenses.map((exp) => {
-                  const items = getExpenseFilteredItems(exp);
+                  const cardSortOrder = getCategorySortOrder(exp.id);
+                  const items = sortExpenseItems(getExpenseFilteredItems(exp), cardSortOrder);
                   const cardTotal = getExpenseTotal(exp);
 
                   return (
@@ -2508,7 +2543,21 @@ export default function Expenditure({
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="border-b border-gray-200 text-gray-400 font-semibold uppercase">
-                            <th className="py-1.5 px-2">Date</th>
+                            <th className="py-1.5 px-2">
+                              <button
+                                type="button"
+                                onClick={() => toggleCategoryDateSortOrder(exp.id)}
+                                className="flex items-center gap-1 hover:text-indigo-600 transition-colors cursor-pointer select-none"
+                                title={`Date Order: ${cardSortOrder === 'desc' ? 'Descending (Click to sort Ascending)' : 'Ascending (Click to sort Descending)'}`}
+                              >
+                                <span>Date</span>
+                                {cardSortOrder === 'desc' ? (
+                                  <ArrowDown className="w-3 h-3 text-indigo-600" />
+                                ) : (
+                                  <ArrowUp className="w-3 h-3 text-indigo-600" />
+                                )}
+                              </button>
+                            </th>
                             <th className="py-1.5 px-2">Detail</th>
                             {(exp.customColumns || []).map((col) => (
                               <th key={col} className="py-1.5 px-2">

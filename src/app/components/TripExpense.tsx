@@ -1,7 +1,7 @@
 // Trip Expense Component with Timing Column support
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
-import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical, Zap, UserX, UserCheck, Clock } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical, Zap, UserX, UserCheck, Clock, ArrowUp, ArrowDown } from 'lucide-react';
 import { format } from 'date-fns';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -283,10 +283,10 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
   const handleAddTrip = () => {
     const newTripId = `trip_${Date.now()}`;
     setCreatedTripIds((prev) => [...prev, newTripId]);
+    setExpandedTrips((prev) => ({ ...prev, [newTripId]: true }));
     const newTrip: Trip = {
       id: newTripId,
       title: 'New Trip',
-      expanded: true,
       columns: [
         { id: 'date', name: 'Date', type: 'date' },
         { id: 'expense_for', name: 'Expense for', type: 'text' },
@@ -311,17 +311,30 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     setConfirmDelete(null);
   };
 
-  const [collapsedTrips, setCollapsedTrips] = useState<Record<string, boolean>>({});
+  const [expandedTrips, setExpandedTrips] = useState<Record<string, boolean>>({});
 
   const toggleTripExpanded = (tripId: string) => {
-    setCollapsedTrips((prev) => ({
+    setExpandedTrips((prev) => ({
       ...prev,
       [tripId]: !prev[tripId],
     }));
   };
 
   const isTripExpanded = (trip: Trip) => {
-    return collapsedTrips[trip.id] !== undefined ? !collapsedTrips[trip.id] : (trip.expanded !== false);
+    return Boolean(expandedTrips[trip.id]);
+  };
+
+  const [tripDateSortOrder, setTripDateSortOrder] = useState<Record<string, 'asc' | 'desc'>>({});
+
+  const getTripDateSortOrder = (tripId: string): 'asc' | 'desc' => {
+    return tripDateSortOrder[tripId] || 'desc';
+  };
+
+  const toggleTripDateSortOrder = (tripId: string) => {
+    setTripDateSortOrder((prev) => ({
+      ...prev,
+      [tripId]: (prev[tripId] || 'desc') === 'desc' ? 'asc' : 'desc',
+    }));
   };
 
   // Edit Trip Title
@@ -649,14 +662,17 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
 
     const dateCol = trip.columns.find((c) => c.type === 'date');
     if (dateCol) {
+      const order = tripDateSortOrder[trip.id] || 'desc';
       return [...entries].sort((a, b) => {
         const valA = a.data[dateCol.id] || '';
         const valB = b.data[dateCol.id] || '';
-        return new Date(valB).getTime() - new Date(valA).getTime();
+        const timeA = valA ? new Date(valA.replace(/-/g, '/')).getTime() : 0;
+        const timeB = valB ? new Date(valB.replace(/-/g, '/')).getTime() : 0;
+        return order === 'asc' ? timeA - timeB : timeB - timeA;
       });
     }
     return entries;
-  }, [spenderFilters]);
+  }, [spenderFilters, tripDateSortOrder]);
 
   // Calculations for dynamic totals (running on filtered entries)
   const calculateTotals = useCallback((trip: Trip, entriesToSum: TripEntry[]) => {
@@ -1112,6 +1128,21 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                             {col.name}
                                           </span>
                                           
+                                          {col.type === 'date' && (
+                                            <button
+                                              type="button"
+                                              onClick={() => toggleTripDateSortOrder(trip.id)}
+                                              className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer text-indigo-600 dark:text-indigo-400 flex items-center"
+                                              title={`Date Order: ${getTripDateSortOrder(trip.id) === 'desc' ? 'Descending (Click for Ascending)' : 'Ascending (Click for Descending)'}`}
+                                            >
+                                              {getTripDateSortOrder(trip.id) === 'desc' ? (
+                                                <ArrowDown className="w-3.5 h-3.5" />
+                                              ) : (
+                                                <ArrowUp className="w-3.5 h-3.5" />
+                                              )}
+                                            </button>
+                                          )}
+
                                           {col.id === 'spender' && (
                                             <div ref={showFilterMenuId === trip.id ? activeMenuRef : null} className="relative inline-block">
                                               <button
