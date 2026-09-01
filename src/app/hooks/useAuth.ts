@@ -8,7 +8,7 @@ export type { AppUserProfile, AppUserRecord };
 
 const ALL_COMPONENTS = ['activities', 'tracking', 'meals', 'workout', 'expenses', 'calendar'];
 const MAIN_ADMIN_EMAILS = ['slbbalaje@gmail.com', 'slbbalaji@gmail.com'];
-const MAX_CONCURRENT_USERS = 5;
+const MAX_CONCURRENT_USERS = 20;
 
 export function isMainAdminEmail(email?: string | null): boolean {
   if (!email) return false;

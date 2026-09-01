@@ -441,23 +441,44 @@ export default function Expenditure({
     return hasTime ? format(d, 'MMM d, yyyy · h:mm a') : format(d, 'MMM d, yyyy');
   }, []);
 
-  // Last used time calculation for current active filter
-  const lastUsedFilterTime = useMemo(() => {
+  // Last updated info: find the most recently updated expense card & its last item in current filter
+  const lastUpdatedInfo = useMemo(() => {
     let maxTime = 0;
+    let bestExpenseName = '';
+    let bestExpenseIcon = '';
+    let bestItem: ExpenseItem | null = null;
+
     filteredExpenses.forEach((exp) => {
       if (exp.items && exp.items.length > 0) {
         exp.items.forEach((item) => {
           if (isDateMatchPeriod(item.date)) {
             const ts = getItemOrExpenseTimestamp(item.id, item.date);
-            if (ts > maxTime) maxTime = ts;
+            if (ts > maxTime) {
+              maxTime = ts;
+              bestExpenseName = exp.description;
+              bestExpenseIcon = exp.icon || '';
+              bestItem = item;
+            }
           }
         });
       } else if (isDateMatchPeriod(exp.date)) {
         const ts = getItemOrExpenseTimestamp(exp.id, exp.date);
-        if (ts > maxTime) maxTime = ts;
+        if (ts > maxTime) {
+          maxTime = ts;
+          bestExpenseName = exp.description;
+          bestExpenseIcon = exp.icon || '';
+          bestItem = null;
+        }
       }
     });
-    return formatLastUsedTimestamp(maxTime);
+
+    if (!maxTime) return null;
+    return {
+      expenseName: bestExpenseName,
+      expenseIcon: bestExpenseIcon,
+      item: bestItem as ExpenseItem | null,
+      time: formatLastUsedTimestamp(maxTime),
+    };
   }, [filteredExpenses, isDateMatchPeriod, getItemOrExpenseTimestamp, formatLastUsedTimestamp]);
 
   // Last used time calculation for specific category in filter dropdown
@@ -1262,12 +1283,45 @@ export default function Expenditure({
               )}
             </div>
 
-            {/* Last Used Time Display under filter */}
-            <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300 bg-indigo-50/70 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900 px-3 py-1 rounded-lg shadow-2xs">
-              <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-              <span className="font-medium text-gray-500 dark:text-gray-400">Last used time:</span>
-              <span className="font-bold text-indigo-950 dark:text-indigo-200">{lastUsedFilterTime}</span>
-            </div>
+            {/* Last Updated Component Display under filter */}
+            {lastUpdatedInfo ? (
+              <div className="flex items-center gap-1.5 text-xs bg-indigo-50/70 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900 px-3 py-1.5 rounded-lg shadow-2xs flex-wrap">
+                <Clock className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 flex-shrink-0" />
+                <span className="font-medium text-gray-500 dark:text-gray-400 flex-shrink-0">Last updated:</span>
+                {lastUpdatedInfo.expenseIcon && (
+                  <span className="text-sm leading-none">{lastUpdatedInfo.expenseIcon}</span>
+                )}
+                <span className="font-bold text-indigo-700 dark:text-indigo-300 flex-shrink-0">
+                  {lastUpdatedInfo.expenseName}
+                </span>
+                {lastUpdatedInfo.item && (
+                  <>
+                    <span className="text-gray-300 dark:text-gray-600">·</span>
+                    <span className="text-gray-500 dark:text-gray-400 font-normal">
+                      {lastUpdatedInfo.item.date ? format(parseISO(lastUpdatedInfo.item.date), 'dd MMM yyyy') : ''}
+                    </span>
+                    <span className="text-gray-300 dark:text-gray-600">·</span>
+                    <span className="font-semibold text-gray-700 dark:text-gray-200 truncate max-w-[150px]">
+                      {lastUpdatedInfo.item.item}
+                    </span>
+                    <span className="text-gray-300 dark:text-gray-600">·</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                      ${Number(lastUpdatedInfo.item.amount || 0).toFixed(2)}
+                    </span>
+                  </>
+                )}
+                <span className="text-gray-300 dark:text-gray-600">·</span>
+                <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                  ({lastUpdatedInfo.time})
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300 bg-indigo-50/70 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900 px-3 py-1 rounded-lg shadow-2xs">
+                <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span className="font-medium text-gray-500 dark:text-gray-400">Last updated:</span>
+                <span className="font-bold text-indigo-950 dark:text-indigo-200">Never used</span>
+              </div>
+            )}
           </div>
         </div>
 
