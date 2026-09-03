@@ -31,11 +31,13 @@ import {
   Lock,
   User,
   KeyRound,
+  Target,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import DailyActivities from './components/DailyActivities';
 import MealSchedule from './components/MealSchedule';
 import WorkoutSchedule from './components/WorkoutSchedule';
+import Plans from './components/Plans';
 import Expenditure from './components/Expenditure';
 import CalendarView from './components/CalendarView';
 import Tracking from './components/Tracking';
@@ -48,7 +50,7 @@ import { Language, t } from './utils/translations';
 import { startNotificationScheduler, stopNotificationScheduler } from './utils/notificationScheduler';
 import { supabase } from '../lib/supabaseClient';
 
-type Tab = 'activities' | 'meals' | 'workout' | 'expenses' | 'calendar' | 'tracking';
+type Tab = 'activities' | 'meals' | 'workout' | 'plans' | 'expenses' | 'calendar' | 'tracking';
 type Person = 'partner1' | 'partner2' | 'both';
 type AvatarType = 'letter' | 'emoji' | 'photo';
 type ThemeMode = 'light' | 'dark';
@@ -107,6 +109,7 @@ const COMPONENT_OPTIONS: { id: Tab; label: string }[] = [
   { id: 'tracking', label: 'Tracking Reminders' },
   { id: 'meals', label: 'Meal Schedule' },
   { id: 'workout', label: 'Workout Schedule' },
+  { id: 'plans', label: 'Plans & Goals' },
   { id: 'calendar', label: 'Calendar View' },
 ];
 
@@ -1345,11 +1348,12 @@ export default function App() {
     { id: 'expenses' as Tab, label: t('expenses', lang), icon: IndianRupee },
     { id: 'tracking' as Tab, label: t('tracking', lang), icon: ListChecks },
     { id: 'workout' as Tab, label: t('workout', lang), icon: Dumbbell },
+    { id: 'plans' as Tab, label: t('plans', lang), icon: Target },
     { id: 'calendar' as Tab, label: t('calendar', lang), icon: Calendar },
   ];
 
   // Component access control filtering for sub-users
-  const allowedComponents = userProfile?.allowedComponents || ['expenses'];
+  const allowedComponents = userProfile?.allowedComponents || ['expenses', 'activities', 'tracking', 'meals', 'workout', 'plans', 'calendar'];
   const allowedTripIds = userProfile?.allowedTripIds || ['*'];
   const tabs = allTabs.filter((tab) => allowedComponents.includes(tab.id));
   const isReadOnly = userProfile?.accessLevel === 'view_only';
@@ -1490,6 +1494,7 @@ export default function App() {
         {activeTab === 'activities' && allowedComponents.includes('activities') && <DailyActivities {...sharedProps} trackingReminders={trackingReminders} onUpdateTrackingReminders={updateTrackingReminders} onUnsavedChanges={handleUnsavedChanges} />}
         {activeTab === 'meals'      && allowedComponents.includes('meals')      && <MealSchedule {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
         {activeTab === 'workout'    && allowedComponents.includes('workout')    && <WorkoutSchedule {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
+        {activeTab === 'plans'      && allowedComponents.includes('plans')      && <Plans {...sharedProps} onUnsavedChanges={handleUnsavedChanges} isReadOnly={isReadOnly} />}
         {activeTab === 'expenses'   && allowedComponents.includes('expenses')   && <Expenditure {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
         {activeTab === 'calendar'   && allowedComponents.includes('calendar')   && <CalendarView {...sharedProps} onUnsavedChanges={handleUnsavedChanges} />}
         {activeTab === 'tracking'   && allowedComponents.includes('tracking')   && <Tracking {...sharedProps} reminders={trackingReminders} onAddReminder={addTrackingReminder} onUpdateReminders={updateTrackingReminders} onUnsavedChanges={handleUnsavedChanges} />}

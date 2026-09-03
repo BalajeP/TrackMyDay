@@ -1,7 +1,7 @@
 import { supabase } from '../../lib/supabaseClient';
 import { AppUserProfile } from './subAdminService';
 
-const ALL_COMPONENTS = ['activities', 'tracking', 'meals', 'workout', 'expenses', 'calendar'];
+const ALL_COMPONENTS = ['activities', 'tracking', 'meals', 'workout', 'plans', 'expenses', 'calendar'];
 
 /**
  * Service for Main Account Registration (Sign Up) & Authentication (Supabase Auth)

@@ -20,6 +20,7 @@ export interface TranslationDictionary {
   tracking: string;
   meals: string;
   workout: string;
+  plans: string;
   expenses: string;
   calendar: string;
 
@@ -90,6 +91,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
     tracking: 'Tracking',
     meals: 'Meals',
     workout: 'Workout',
+    plans: 'Plans',
     expenses: 'Expenses',
     calendar: 'Calendar',
 
@@ -157,6 +159,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
     tracking: 'கண்காணிப்பு',
     meals: 'உணவு',
     workout: 'உடற்பயிற்சி',
+    plans: 'திட்டங்கள்',
     expenses: 'செலவுகள்',
     calendar: 'நாட்காட்டி',
 
@@ -224,6 +227,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
     tracking: 'ट्रैकिंग',
     meals: 'भोजन',
     workout: 'व्यायाम',
+    plans: 'योजनाएं',
     expenses: 'खर्च',
     calendar: 'कैलेंडर',
 
