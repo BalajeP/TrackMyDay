@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Target, TrendingUp, Calendar, DollarSign, Edit2, Check, X, Save } from 'lucide-react';
+import { Plus, Trash2, Target, TrendingUp, Calendar, IndianRupee, Edit2, Check, X, Save } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
 
@@ -141,10 +141,10 @@ export default function SavingsGoals({ activePerson, partner1Name, partner2Name,
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg p-6 border border-gray-200">
           <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="w-5 h-5 text-indigo-600" />
+            <IndianRupee className="w-5 h-5 text-indigo-600" />
             <p className="text-sm text-gray-600">Total Saved</p>
           </div>
-          <p className="text-3xl font-bold text-indigo-600">${totalSavings.toFixed(2)}</p>
+          <p className="text-3xl font-bold text-indigo-600">₹{totalSavings.toFixed(2)}</p>
           <p className="text-xs text-gray-500 mt-1">across all goals</p>
         </div>
         <div className="bg-white rounded-lg p-6 border border-gray-200">
@@ -152,7 +152,7 @@ export default function SavingsGoals({ activePerson, partner1Name, partner2Name,
             <Target className="w-5 h-5 text-green-600" />
             <p className="text-sm text-gray-600">Total Target</p>
           </div>
-          <p className="text-3xl font-bold text-green-600">${totalTarget.toFixed(2)}</p>
+          <p className="text-3xl font-bold text-green-600">₹{totalTarget.toFixed(2)}</p>
           <p className="text-xs text-gray-500 mt-1">to reach</p>
         </div>
         <div className="bg-white rounded-lg p-6 border border-gray-200">
@@ -279,10 +279,10 @@ export default function SavingsGoals({ activePerson, partner1Name, partner2Name,
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-2xl font-bold text-gray-900">
-                      ${goal.currentAmount.toFixed(2)}
+                      ₹{goal.currentAmount.toFixed(2)}
                     </span>
                     <span className="text-lg text-gray-600">
-                      / ${goal.targetAmount.toFixed(2)}
+                      / ₹{goal.targetAmount.toFixed(2)}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-4">
@@ -296,7 +296,7 @@ export default function SavingsGoals({ activePerson, partner1Name, partner2Name,
                   <div className="flex justify-between items-center mt-1">
                     <span className="text-sm text-gray-600">{progress.toFixed(1)}% complete</span>
                     <span className="text-sm text-gray-600">
-                      ${(goal.targetAmount - goal.currentAmount).toFixed(2)} remaining
+                      ₹{(goal.targetAmount - goal.currentAmount).toFixed(2)} remaining
                     </span>
                   </div>
                 </div>

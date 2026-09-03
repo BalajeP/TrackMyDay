@@ -321,10 +321,17 @@ export default function Expenditure({
 
   // Add Expense Modal State
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
-  const [newDescription, setNewDescription] = useState<string>('Food');
+  const [newDescription, setNewDescription] = useState<string>('');
   const [newPerson, setNewPerson] = useState<Person>(activePerson);
   const [selectedIcon, setSelectedIcon] = useState<string>('🍔');
   const [activeEmojiTab, setActiveEmojiTab] = useState<number>(0);
+
+  // Check if entered description matches an existing expense card
+  const isDuplicateTitle = useMemo(() => {
+    const trimmed = newDescription.trim().toLowerCase();
+    if (!trimmed) return false;
+    return expenses.some((exp) => exp.description.trim().toLowerCase() === trimmed);
+  }, [newDescription, expenses]);
 
   // Trip Expense State
   const [hasUnsavedTrip, setHasUnsavedTrip] = useState(false);
@@ -725,16 +732,15 @@ export default function Expenditure({
   };
 
   const handleOpenAddModal = () => {
-    const initialCat = categories.length > 0 ? categories[0] : 'Food';
-    setNewDescription(initialCat);
-    setSelectedIcon(getEmojiForCategoryOrTitle(initialCat));
+    setNewDescription('');
+    setSelectedIcon('🍔');
     setShowAddModal(true);
   };
 
   // Handlers for Add Expense Card
   const handleCreateExpense = () => {
     const title = newDescription.trim();
-    if (!title) return;
+    if (!title || isDuplicateTitle) return;
 
     const matchedCat = categories.find((c) => c.toLowerCase() === title.toLowerCase());
     const finalCat = matchedCat || title;
@@ -1306,7 +1312,7 @@ export default function Expenditure({
                     </span>
                     <span className="text-gray-300 dark:text-gray-600">·</span>
                     <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                      ${Number(lastUpdatedInfo.item.amount || 0).toFixed(2)}
+                      ₹{Number(lastUpdatedInfo.item.amount || 0).toFixed(2)}
                     </span>
                   </>
                 )}
@@ -1377,7 +1383,7 @@ export default function Expenditure({
                       {hoveredCategory}
                     </span>
                     <span className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400">
-                      ${(categoryTotals[hoveredCategory] || 0).toFixed(2)}
+                      ₹{(categoryTotals[hoveredCategory] || 0).toFixed(2)}
                     </span>
                     <span className="text-[10px] text-gray-400 dark:text-gray-500">
                       {((categoryTotals[hoveredCategory] / (totalSpentAll || 1)) * 100).toFixed(1)}%
@@ -1389,7 +1395,7 @@ export default function Expenditure({
                       Total Spent
                     </span>
                     <span className="text-base font-extrabold text-gray-900 dark:text-gray-100">
-                      ${totalSpentAll.toFixed(2)}
+                      ₹{totalSpentAll.toFixed(2)}
                     </span>
                   </>
                 )}
@@ -1405,7 +1411,7 @@ export default function Expenditure({
                 </h4>
 
                 <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">
-                  ${totalSpentAll.toFixed(2)}
+                  ₹{totalSpentAll.toFixed(2)}
                 </span>
               </div>
 
@@ -1433,14 +1439,14 @@ export default function Expenditure({
                         />
                         <span
                           className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate"
-                          title={`${segment.category}: $${segment.amount.toFixed(2)}`}
+                          title={`${segment.category}: ₹${segment.amount.toFixed(2)}`}
                         >
                           {segment.category}
                         </span>
                       </div>
                       <div className="text-right flex-shrink-0">
                         <span className="text-xs font-bold text-gray-900 dark:text-gray-100 block">
-                          ${segment.amount.toFixed(2)}
+                          ₹{segment.amount.toFixed(2)}
                         </span>
                         <span className="text-[10px] text-gray-400 dark:text-gray-500 block">
                           {segment.percentage.toFixed(1)}%
@@ -1705,7 +1711,7 @@ export default function Expenditure({
                             {expense.description}
                           </h4>
                           <span className="text-base font-extrabold text-indigo-600 dark:text-indigo-400 block mt-0.5">
-                            ${totalSpent.toFixed(2)}
+                            ₹{totalSpent.toFixed(2)}
                           </span>
                         </div>
 
@@ -2081,7 +2087,7 @@ export default function Expenditure({
                   <input
                     type="number"
                     step="0.01"
-                    placeholder="Amount ($)..."
+                    placeholder="Amount (₹)..."
                     value={itemForms[activeDetailExpense.id]?.amount || ''}
                     onChange={(e) =>
                       setItemForms((prev) => ({
@@ -2224,7 +2230,7 @@ export default function Expenditure({
                         );
                       })}
 
-                      <th className="py-2.5 px-3 text-right">Amount ($)</th>
+                      <th className="py-2.5 px-3 text-right">Amount (₹)</th>
                       <th className="py-2.5 px-3 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -2394,7 +2400,7 @@ export default function Expenditure({
                             ))}
 
                             <td className="py-3 px-3 text-right font-bold text-gray-900 dark:text-gray-100">
-                              ${item.amount.toFixed(2)}
+                              ₹{item.amount.toFixed(2)}
                             </td>
                             <td className="py-3 px-3 text-right">
                               <div className="flex items-center justify-end gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
@@ -2438,7 +2444,7 @@ export default function Expenditure({
                 {activeDetailExpense.description} Total Spent:
               </span>
               <span className="text-lg font-extrabold text-indigo-600">
-                ${getExpenseTotal(activeDetailExpense).toFixed(2)}
+                ₹{getExpenseTotal(activeDetailExpense).toFixed(2)}
               </span>
             </div>
           </div>
@@ -2517,7 +2523,7 @@ export default function Expenditure({
                 <div className="bg-indigo-50/70 border border-indigo-100 p-4 rounded-xl text-center">
                   <span className="text-xs text-gray-500 font-bold uppercase block">Total Spent</span>
                   <span className="text-2xl font-black text-indigo-600 mt-1 block">
-                    ${totalSpentAll.toFixed(2)}
+                    ₹{totalSpentAll.toFixed(2)}
                   </span>
                 </div>
                 <div className="bg-purple-50/70 border border-purple-100 p-4 rounded-xl text-center">
@@ -2540,7 +2546,7 @@ export default function Expenditure({
                   <thead className="bg-gray-100 text-gray-600 font-bold uppercase">
                     <tr>
                       <th className="py-2.5 px-4">Category</th>
-                      <th className="py-2.5 px-4 text-right">Amount ($)</th>
+                      <th className="py-2.5 px-4 text-right">Amount (₹)</th>
                       <th className="py-2.5 px-4 text-right">% Breakdown</th>
                     </tr>
                   </thead>
@@ -2551,7 +2557,7 @@ export default function Expenditure({
                         <tr key={cat}>
                           <td className="py-2 px-4 font-semibold text-gray-800">{cat}</td>
                           <td className="py-2 px-4 text-right font-bold text-gray-900">
-                            ${amt.toFixed(2)}
+                            ₹{amt.toFixed(2)}
                           </td>
                           <td className="py-2 px-4 text-right text-gray-500">{pct.toFixed(1)}%</td>
                         </tr>
@@ -2589,7 +2595,7 @@ export default function Expenditure({
                           <span className="text-xs text-gray-400">({items.length} entries)</span>
                         </div>
                         <span className="text-sm font-extrabold text-indigo-600">
-                          ${cardTotal.toFixed(2)}
+                          ₹{cardTotal.toFixed(2)}
                         </span>
                       </div>
 
@@ -2618,7 +2624,7 @@ export default function Expenditure({
                                 {col}
                               </th>
                             ))}
-                            <th className="py-1.5 px-2 text-right">Amount ($)</th>
+                            <th className="py-1.5 px-2 text-right">Amount (₹)</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -2646,7 +2652,7 @@ export default function Expenditure({
                                   </td>
                                 ))}
                                 <td className="py-2 px-2 text-right font-bold text-gray-900">
-                                  ${item.amount.toFixed(2)}
+                                  ₹{item.amount.toFixed(2)}
                                 </td>
                               </tr>
                             ))
@@ -2691,17 +2697,36 @@ export default function Expenditure({
             <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               {/* Title / Item Name */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
                   Title / Item Name
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Food, Zomato, EB Reading, Milk"
+                  placeholder="e.g. Groceries, Rent, Gym, Travel, Food..."
                   value={newDescription}
                   onChange={(e) => handleTitleChange(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newDescription.trim() && !isDuplicateTitle) {
+                      handleCreateExpense();
+                    }
+                  }}
                   autoFocus
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full px-3.5 py-2 text-sm border rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 transition-all ${
+                    isDuplicateTitle
+                      ? 'border-red-400 dark:border-red-500 focus:ring-red-400'
+                      : 'border-gray-300 dark:border-gray-600 focus:ring-indigo-500'
+                  }`}
                 />
+                {isDuplicateTitle ? (
+                  <p className="text-xs text-red-500 dark:text-red-400 mt-1.5 flex items-center gap-1 font-medium">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    An expense card with this title already exists. Please choose a different title.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                    Add a unique title for your new expense category.
+                  </p>
+                )}
               </div>
 
               {/* Emoji Icon Picker */}
@@ -2751,19 +2776,19 @@ export default function Expenditure({
             </div>
 
             {/* Modal Actions */}
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3">
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 dark:bg-gray-850 flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-gray-800 rounded-xl hover:bg-gray-200/60"
+                className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white rounded-xl hover:bg-gray-200/60 dark:hover:bg-gray-700 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleCreateExpense}
-                disabled={!newDescription.trim()}
-                className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-all disabled:opacity-40"
+                disabled={!newDescription.trim() || isDuplicateTitle}
+                className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 Save Expense Card
               </button>

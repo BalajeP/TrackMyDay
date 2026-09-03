@@ -1,7 +1,8 @@
 // Trip Expense Component with Timing Column support
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
-import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical, Zap, UserX, UserCheck, Clock, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical, Zap, UserX, UserCheck, Clock, ArrowUp, ArrowDown, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -98,6 +99,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     fromH: string; fromM: string; fromAP: 'AM' | 'PM';
     toH: string; toM: string; toAP: 'AM' | 'PM';
     singleH: string; singleM: string; singleAP: 'AM' | 'PM';
+    anchorRect?: { top: number; left: number; bottom: number; right: number };
   } | null>(null);
   const cellTimePopoverRef = useRef<HTMLDivElement>(null);
 
@@ -112,6 +114,43 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [cellTimePopover]);
+
+  // Split calculation popover state
+  const [splitPopover, setSplitPopover] = useState<{
+    tripId: string;
+    entryId: string;
+    mode: 'exclude' | 'include' | 'all';
+    selectedCols: string[];
+    anchorRect?: { top: number; left: number; bottom: number; right: number };
+  } | null>(null);
+  const splitPopoverRef = useRef<HTMLDivElement>(null);
+
+  // Close split popover on outside click
+  useEffect(() => {
+    if (!splitPopover) return;
+    const handler = (e: MouseEvent) => {
+      if (splitPopoverRef.current && !splitPopoverRef.current.contains(e.target as Node)) {
+        setSplitPopover(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [splitPopover]);
+
+  const getFloatingPopoverStyle = (anchorRect?: { top: number; left: number; bottom: number; right: number }, width = 280) => {
+    if (!anchorRect) return {};
+    if (typeof window !== 'undefined' && window.innerWidth < 640) return {};
+    const padding = 12;
+    const spaceBelow = typeof window !== 'undefined' ? window.innerHeight - anchorRect.bottom : 500;
+    const top = spaceBelow > 280 ? anchorRect.bottom + 6 : Math.max(padding, anchorRect.top - 270);
+    const left = typeof window !== 'undefined'
+      ? Math.max(padding, Math.min(anchorRect.left, window.innerWidth - width - padding))
+      : anchorRect.left;
+    return {
+      top: `${top}px`,
+      left: `${left}px`,
+    };
+  };
 
   // Perform Split Equally across all split columns
   const applySplitEquallyAll = (tripId: string, entryId: string) => {
@@ -401,6 +440,53 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
             ...entry,
             data: { ...(entry.data || {}), [newColId]: '' }
           }));
+          return { ...t, columns: updatedColumns, entries: updatedEntries, updatedAt: new Date().toISOString() };
+        })
+      };
+    });
+  };
+
+  const handleAddSplitColumn = (tripId: string) => {
+    setShowAddColMenu(null);
+    const targetTrip = activeState.trips.find((t) => t.id === tripId);
+    if (!targetTrip) return;
+
+    const splitCols = (targetTrip.columns || []).filter((c) => c.type === 'split');
+
+    setState((prev) => {
+      const currentTrips = (prev && Array.isArray(prev.trips)) ? prev.trips : activeState.trips;
+      return {
+        ...prev,
+        trips: currentTrips.map((t) => {
+          if (t.id !== tripId) return t;
+
+          let updatedColumns = [...(t.columns || [])];
+          let updatedEntries = [...(t.entries || [])];
+
+          if (splitCols.length === 0) {
+            // Initialize with Split Mem 1 and Split Mem 2 on first click
+            const col1: TripColumn = { id: `split_${Date.now()}_1`, name: 'Split Mem 1', type: 'split' };
+            const col2: TripColumn = { id: `split_${Date.now()}_2`, name: 'Split Mem 2', type: 'split' };
+            updatedColumns.push(col1, col2);
+            updatedEntries = updatedEntries.map((e) => ({
+              ...e,
+              data: { ...(e.data || {}), [col1.id]: '', [col2.id]: '' }
+            }));
+          } else {
+            // Incremental additions
+            const nextIndex = splitCols.length + 1;
+            const newCol: TripColumn = {
+              id: `split_${Date.now()}`,
+              name: `Split Mem ${nextIndex}`,
+              type: 'split'
+            };
+            updatedColumns.push(newCol);
+            updatedEntries = updatedEntries.map((e) => ({
+              ...e,
+              data: { ...(e.data || {}), [newCol.id]: '' }
+            }));
+          }
+
           return { ...t, columns: updatedColumns, entries: updatedEntries, updatedAt: new Date().toISOString() };
         })
       };
@@ -761,7 +847,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
         if (col.type === 'date' && val) {
           val = formatDateSafe(val);
         } else if (col.type === 'number' || col.type === 'split') {
-          val = val ? `$${parseFloat(val).toFixed(2)}` : '$0.00';
+          val = val ? `₹${parseFloat(val).toFixed(2)}` : '₹0.00';
         }
         return `<td>${val}</td>`;
       }).join('')}</tr>`;
@@ -773,7 +859,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
         ${trip.columns.map((col, idx) => {
           if (idx === 0) return `<td>Total</td>`;
           if (col.type === 'number' || col.type === 'split') {
-            return `<td>$${totals[col.id].toFixed(2)}</td>`;
+            return `<td>₹${totals[col.id].toFixed(2)}</td>`;
           }
           return `<td>-</td>`;
         }).join('')}
@@ -974,7 +1060,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                             </h3>
                             <button
                               onClick={(e) => { e.stopPropagation(); startEditingTitle(trip.id, trip.title); }}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-opacity"
+                              className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-opacity"
                               title="Edit Trip Title"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
@@ -1033,7 +1119,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                           </button>
 
                           {showAddColMenu === trip.id && (
-                            <div className="absolute right-0 top-full mt-1.5 z-30 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1.5 min-w-[160px] animate-in fade-in duration-100">
+                            <div className="absolute right-0 top-full mt-1.5 z-30 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1.5 min-w-[170px] animate-in fade-in duration-100">
                               <button
                                 onClick={() => handleAddNormalColumn(trip.id)}
                                 className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
@@ -1041,13 +1127,11 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                 Normal Column
                               </button>
                               <button
-                                disabled={!(trip.entries && trip.entries.length > 0)}
-                                onClick={() => handleAddTimingColumn(trip.id)}
-                                className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-violet-600 dark:hover:text-violet-400 transition-colors border-t border-gray-100 dark:border-gray-700 cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                                title={trip.entries && trip.entries.length > 0 ? "Add Timing Column" : "Add at least one row first to enable Time Planner"}
+                                onClick={() => handleAddSplitColumn(trip.id)}
+                                className="w-full text-left px-3.5 py-2 text-xs font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors border-t border-gray-100 dark:border-gray-700 cursor-pointer flex items-center gap-2"
                               >
-                                <Clock className="w-3.5 h-3.5 text-violet-500" />
-                                Timing Column
+                                <Users className="w-3.5 h-3.5 text-indigo-500" />
+                                <span>Add Split Member</span>
                               </button>
                             </div>
                           )}
@@ -1198,7 +1282,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                           )}
                                         </div>
 
-                                        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                           <button
                                             onClick={() => startEditingColumn(trip.id, col.id, col.name)}
                                             className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400"
@@ -1262,10 +1346,57 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                   }
                                                   className="w-full px-2 py-1.5 border border-indigo-200 dark:border-indigo-700 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                                 />
+                                              ) : col.id === 'total_amount' ? (
+                                                <div className="flex items-center gap-1.5 min-w-[175px]">
+                                                  <div className="relative flex-1">
+                                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xxs">
+                                                      ₹
+                                                    </span>
+                                                    <input
+                                                      type="number"
+                                                      placeholder="0.00"
+                                                      step="0.01"
+                                                      value={value}
+                                                      onChange={(e) =>
+                                                        updateBufferValue(trip.id, entry.id, col.id, e.target.value)
+                                                      }
+                                                      className="w-full pl-5 pr-1.5 py-1.5 border border-indigo-200 dark:border-indigo-700 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                                    />
+                                                  </div>
+
+                                                  {/* Split Button next to Total Amount */}
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      if (splitPopover?.tripId === trip.id && splitPopover?.entryId === entry.id) {
+                                                        setSplitPopover(null);
+                                                      } else {
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        setSplitPopover({
+                                                          tripId: trip.id,
+                                                          entryId: entry.id,
+                                                          mode: 'exclude',
+                                                          selectedCols: [],
+                                                          anchorRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right },
+                                                        });
+                                                      }
+                                                    }}
+                                                    className={`px-2 py-1.5 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1 cursor-pointer shrink-0 shadow-xs ${
+                                                      splitPopover?.tripId === trip.id && splitPopover?.entryId === entry.id
+                                                        ? 'bg-indigo-600 text-white border-indigo-600'
+                                                        : 'bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'
+                                                    }`}
+                                                    title="Split Options (Exclude, Include, Split Equally)"
+                                                  >
+                                                    <Calculator className="w-3.5 h-3.5" />
+                                                    <span>Split</span>
+                                                  </button>
+                                                </div>
                                               ) : col.type === 'number' || col.type === 'split' ? (
                                                 <div className="relative">
                                                   <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xxs">
-                                                    $
+                                                    ₹
                                                   </span>
                                                   <input
                                                     type="number"
@@ -1293,6 +1424,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                     type="button"
                                                     onClick={(e) => {
                                                       e.stopPropagation();
+                                                      const rect = e.currentTarget.getBoundingClientRect();
                                                       setCellTimePopover(
                                                         cellTimePopover?.tripId === trip.id && cellTimePopover?.entryId === entry.id && cellTimePopover?.colId === col.id
                                                           ? null
@@ -1303,211 +1435,16 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                               mode: 'range',
                                                               fromH: '09', fromM: '00', fromAP: 'AM',
                                                               toH: '10', toM: '00', toAP: 'AM',
-                                                              singleH: '09', singleM: '00', singleAP: 'AM'
+                                                              singleH: '09', singleM: '00', singleAP: 'AM',
+                                                              anchorRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right },
                                                             }
                                                       );
                                                     }}
-                                                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/50 rounded transition-colors"
+                                                    className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/50 rounded transition-colors cursor-pointer"
                                                     title="Timing Picker (Range / Single)"
                                                   >
                                                     <Clock className="w-3.5 h-3.5" />
                                                   </button>
-
-                                                  {cellTimePopover?.tripId === trip.id && cellTimePopover?.entryId === entry.id && cellTimePopover?.colId === col.id && (
-                                                    <div
-                                                      ref={cellTimePopoverRef}
-                                                      onClick={(e) => e.stopPropagation()}
-                                                      className="absolute left-0 top-full mt-1.5 z-50 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-violet-200 dark:border-violet-700 p-3.5 w-72 text-left animate-in fade-in duration-100"
-                                                    >
-                                                      <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-2 mb-2.5">
-                                                        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-gray-100">
-                                                          <Clock className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
-                                                          <span>Select Timing</span>
-                                                        </div>
-                                                        <button
-                                                          type="button"
-                                                          onClick={() => setCellTimePopover(null)}
-                                                          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-0.5 rounded"
-                                                        >
-                                                          <X className="w-3.5 h-3.5" />
-                                                        </button>
-                                                      </div>
-
-                                                      <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700/60 p-0.5 mb-3 text-[10px] font-bold">
-                                                        <button
-                                                          type="button"
-                                                          onClick={() => setCellTimePopover((p) => p ? { ...p, mode: 'range' } : null)}
-                                                          className={`flex-1 py-1 rounded-md transition-colors text-center ${
-                                                            cellTimePopover.mode === 'range'
-                                                              ? 'bg-violet-600 text-white shadow-2xs font-bold'
-                                                              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                                                          }`}
-                                                        >
-                                                          1. From – To AM/PM
-                                                        </button>
-                                                        <button
-                                                          type="button"
-                                                          onClick={() => setCellTimePopover((p) => p ? { ...p, mode: 'single' } : null)}
-                                                          className={`flex-1 py-1 rounded-md transition-colors text-center ${
-                                                            cellTimePopover.mode === 'single'
-                                                              ? 'bg-violet-600 text-white shadow-2xs font-bold'
-                                                              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                                                          }`}
-                                                        >
-                                                          2. Single Time
-                                                        </button>
-                                                      </div>
-
-                                                      {cellTimePopover.mode === 'range' ? (
-                                                        <div className="space-y-2">
-                                                          <div className="flex items-center gap-1">
-                                                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 w-8">From</span>
-                                                            <select
-                                                              value={cellTimePopover.fromH}
-                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, fromH: e.target.value } : null)}
-                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                                                            >
-                                                              {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
-                                                                <option key={h} value={h}>{h}</option>
-                                                              ))}
-                                                            </select>
-                                                            <span className="text-gray-400 text-xs">:</span>
-                                                            <select
-                                                              value={cellTimePopover.fromM}
-                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, fromM: e.target.value } : null)}
-                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                                                            >
-                                                              {['00', '15', '30', '45'].map((m) => (
-                                                                <option key={m} value={m}>{m}</option>
-                                                              ))}
-                                                            </select>
-                                                            <div className="flex rounded border border-violet-200 dark:border-violet-700 overflow-hidden">
-                                                              {(['AM', 'PM'] as const).map((ap) => (
-                                                                <button
-                                                                  key={ap}
-                                                                  type="button"
-                                                                  onClick={() => setCellTimePopover((p) => p ? { ...p, fromAP: ap } : null)}
-                                                                  className={`px-1.5 py-1 text-[10px] font-bold ${
-                                                                    cellTimePopover.fromAP === ap ? 'bg-violet-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-500'
-                                                                  }`}
-                                                                >
-                                                                  {ap}
-                                                                </button>
-                                                              ))}
-                                                            </div>
-                                                          </div>
-
-                                                          <div className="flex items-center gap-1">
-                                                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 w-8">To</span>
-                                                            <select
-                                                              value={cellTimePopover.toH}
-                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, toH: e.target.value } : null)}
-                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                                                            >
-                                                              {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
-                                                                <option key={h} value={h}>{h}</option>
-                                                              ))}
-                                                            </select>
-                                                            <span className="text-gray-400 text-xs">:</span>
-                                                            <select
-                                                              value={cellTimePopover.toM}
-                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, toM: e.target.value } : null)}
-                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                                                            >
-                                                              {['00', '15', '30', '45'].map((m) => (
-                                                                <option key={m} value={m}>{m}</option>
-                                                              ))}
-                                                            </select>
-                                                            <div className="flex rounded border border-violet-200 dark:border-violet-700 overflow-hidden">
-                                                              {(['AM', 'PM'] as const).map((ap) => (
-                                                                <button
-                                                                  key={ap}
-                                                                  type="button"
-                                                                  onClick={() => setCellTimePopover((p) => p ? { ...p, toAP: ap } : null)}
-                                                                  className={`px-1.5 py-1 text-[10px] font-bold ${
-                                                                    cellTimePopover.toAP === ap ? 'bg-violet-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-500'
-                                                                  }`}
-                                                                >
-                                                                  {ap}
-                                                                </button>
-                                                              ))}
-                                                            </div>
-                                                          </div>
-
-                                                          <div className="text-[10px] font-mono text-center text-violet-600 dark:text-violet-400 py-1 font-semibold bg-violet-50 dark:bg-violet-950/40 rounded">
-                                                            {cellTimePopover.fromH}:{cellTimePopover.fromM} {cellTimePopover.fromAP} – {cellTimePopover.toH}:{cellTimePopover.toM} {cellTimePopover.toAP}
-                                                          </div>
-
-                                                          <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                              const formattedTime = `${cellTimePopover.fromH}:${cellTimePopover.fromM} ${cellTimePopover.fromAP} – ${cellTimePopover.toH}:${cellTimePopover.toM} ${cellTimePopover.toAP}`;
-                                                              updateBufferValue(trip.id, entry.id, col.id, formattedTime);
-                                                              setCellTimePopover(null);
-                                                            }}
-                                                            className="w-full py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1"
-                                                          >
-                                                            Set Timing Range
-                                                          </button>
-                                                        </div>
-                                                      ) : (
-                                                        <div className="space-y-2">
-                                                          <div className="flex items-center gap-1">
-                                                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 w-8">Time</span>
-                                                            <select
-                                                              value={cellTimePopover.singleH}
-                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, singleH: e.target.value } : null)}
-                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                                                            >
-                                                              {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
-                                                                <option key={h} value={h}>{h}</option>
-                                                              ))}
-                                                            </select>
-                                                            <span className="text-gray-400 text-xs">:</span>
-                                                            <select
-                                                              value={cellTimePopover.singleM}
-                                                              onChange={(e) => setCellTimePopover((p) => p ? { ...p, singleM: e.target.value } : null)}
-                                                              className="flex-1 px-1 py-1 text-xs border border-violet-200 dark:border-violet-700 rounded bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                                                            >
-                                                              {['00', '15', '30', '45'].map((m) => (
-                                                                <option key={m} value={m}>{m}</option>
-                                                              ))}
-                                                            </select>
-                                                            <div className="flex rounded border border-violet-200 dark:border-violet-700 overflow-hidden">
-                                                              {(['AM', 'PM'] as const).map((ap) => (
-                                                                <button
-                                                                  key={ap}
-                                                                  type="button"
-                                                                  onClick={() => setCellTimePopover((p) => p ? { ...p, singleAP: ap } : null)}
-                                                                  className={`px-1.5 py-1 text-[10px] font-bold ${
-                                                                    cellTimePopover.singleAP === ap ? 'bg-violet-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-500'
-                                                                  }`}
-                                                                >
-                                                                  {ap}
-                                                                </button>
-                                                              ))}
-                                                            </div>
-                                                          </div>
-
-                                                          <div className="text-[10px] font-mono text-center text-violet-600 dark:text-violet-400 py-1 font-semibold bg-violet-50 dark:bg-violet-950/40 rounded">
-                                                            {cellTimePopover.singleH}:{cellTimePopover.singleM} {cellTimePopover.singleAP}
-                                                          </div>
-
-                                                          <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                              const formattedTime = `${cellTimePopover.singleH}:${cellTimePopover.singleM} ${cellTimePopover.singleAP}`;
-                                                              updateBufferValue(trip.id, entry.id, col.id, formattedTime);
-                                                              setCellTimePopover(null);
-                                                            }}
-                                                            className="w-full py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-bold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1"
-                                                          >
-                                                            Set Single Timing
-                                                          </button>
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  )}
                                                 </div>
                                               ) : (
                                                 <input
@@ -1524,8 +1461,34 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                             <span className="text-xs text-gray-800 dark:text-gray-200">
                                               {col.type === 'date' && value ? (
                                                 formatDateSafe(value)
+                                              ) : col.id === 'total_amount' ? (
+                                                <div className="flex items-center justify-between gap-1.5 group/amt">
+                                                  <span className="font-semibold text-gray-900 dark:text-gray-100">
+                                                    {value ? `₹${parseFloat(value).toFixed(2)}` : '₹0.00'}
+                                                  </span>
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      const rect = e.currentTarget.getBoundingClientRect();
+                                                      startEditEntry(trip.id, entry.id, entry.data);
+                                                      setSplitPopover({
+                                                        tripId: trip.id,
+                                                        entryId: entry.id,
+                                                        mode: 'exclude',
+                                                        selectedCols: [],
+                                                        anchorRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right },
+                                                      });
+                                                    }}
+                                                    className="opacity-100 sm:opacity-0 sm:group-hover/amt:opacity-100 transition-opacity px-1.5 py-0.5 text-xxs font-medium rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 flex items-center gap-0.5 cursor-pointer"
+                                                    title="Split this amount"
+                                                  >
+                                                    <Calculator className="w-3 h-3" />
+                                                    <span>Split</span>
+                                                  </button>
+                                                </div>
                                               ) : col.type === 'number' || col.type === 'split' ? (
-                                                value ? `$${parseFloat(value).toFixed(2)}` : '$0.00'
+                                                value ? `₹${parseFloat(value).toFixed(2)}` : '₹0.00'
                                               ) : col.type === 'time' ? (
                                                 value ? (
                                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 font-medium text-xs border border-violet-100 dark:border-violet-800/60 font-mono">
@@ -1556,217 +1519,6 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                             >
                                               <Check className="w-3.5 h-3.5" />
                                             </button>
-
-                                            {trip.columns.some((c) => c.type === 'split') && (
-                                              <div className="relative">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => {
-                                                    if (splitPopover?.tripId === trip.id && splitPopover?.entryId === entry.id) {
-                                                      setSplitPopover(null);
-                                                    } else {
-                                                      setSplitPopover({
-                                                        tripId: trip.id,
-                                                        entryId: entry.id,
-                                                        mode: 'all',
-                                                        selectedCols: [],
-                                                      });
-                                                      applySplitEquallyAll(trip.id, entry.id);
-                                                    }
-                                                  }}
-                                                  className="p-1 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                                                  title="Split Amount Options (Equally / Exclude / Include)"
-                                                >
-                                                  <Calculator className="w-3.5 h-3.5" />
-                                                </button>
-
-                                                {/* Split Calculator Popover Menu */}
-                                                {splitPopover?.tripId === trip.id && splitPopover?.entryId === entry.id && (
-                                                  <div
-                                                    ref={splitPopoverRef}
-                                                    className="absolute right-0 top-full mt-1.5 z-40 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-3.5 w-64 text-left animate-in fade-in duration-100"
-                                                  >
-                                                    <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-2 mb-2">
-                                                      <div className="flex items-center gap-1.5 text-xs font-bold text-gray-900 dark:text-gray-100">
-                                                        <Calculator className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                                                        <span>Split Options</span>
-                                                      </div>
-                                                      <button
-                                                        type="button"
-                                                        onClick={() => setSplitPopover(null)}
-                                                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-0.5"
-                                                      >
-                                                        <X className="w-3.5 h-3.5" />
-                                                      </button>
-                                                    </div>
-
-                                                    {/* 3 Categories / Modes */}
-                                                    <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700/60 p-0.5 mb-3 text-[10px] font-bold">
-                                                      <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                          setSplitPopover((prev) => prev ? { ...prev, mode: 'all' } : null);
-                                                          applySplitEquallyAll(trip.id, entry.id);
-                                                        }}
-                                                        className={`flex-1 py-1 px-1 rounded-md transition-colors text-center ${
-                                                          splitPopover.mode === 'all'
-                                                            ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-2xs font-bold'
-                                                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                                                        }`}
-                                                      >
-                                                        Equally
-                                                      </button>
-
-                                                      <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                          setSplitPopover((prev) => prev ? { ...prev, mode: 'exclude', selectedCols: [] } : null)
-                                                        }
-                                                        className={`flex-1 py-1 px-1 rounded-md transition-colors text-center ${
-                                                          splitPopover.mode === 'exclude'
-                                                            ? 'bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 shadow-2xs font-bold'
-                                                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                                                        }`}
-                                                      >
-                                                        Exclude
-                                                      </button>
-
-                                                      <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                          setSplitPopover((prev) => prev ? { ...prev, mode: 'include', selectedCols: [] } : null)
-                                                        }
-                                                        className={`flex-1 py-1 px-1 rounded-md transition-colors text-center ${
-                                                          splitPopover.mode === 'include'
-                                                            ? 'bg-white dark:bg-gray-800 text-emerald-600 dark:text-emerald-400 shadow-2xs font-bold'
-                                                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                                                        }`}
-                                                      >
-                                                        Include
-                                                      </button>
-                                                    </div>
-
-                                                    {/* Tab 1: Equally to All */}
-                                                    {splitPopover.mode === 'all' && (
-                                                      <div className="space-y-2">
-                                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-                                                          Splits total amount equally across all split members.
-                                                        </p>
-                                                        <button
-                                                          type="button"
-                                                          onClick={() => {
-                                                            applySplitEquallyAll(trip.id, entry.id);
-                                                            setSplitPopover(null);
-                                                          }}
-                                                          className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs"
-                                                        >
-                                                          <Zap className="w-3.5 h-3.5" />
-                                                          Split Equally to All
-                                                        </button>
-                                                      </div>
-                                                    )}
-
-                                                    {/* Tab 2: Exclude Members */}
-                                                    {splitPopover.mode === 'exclude' && (
-                                                      <div className="space-y-2">
-                                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-                                                          Check members to <strong className="text-red-600 dark:text-red-400">EXCLUDE</strong> ($0.00):
-                                                        </p>
-                                                        <div className="space-y-1 max-h-32 overflow-y-auto">
-                                                          {trip.columns
-                                                            .filter((c) => c.type === 'split')
-                                                            .map((col) => {
-                                                              const isChecked = splitPopover.selectedCols.includes(col.id);
-                                                              return (
-                                                                <button
-                                                                  key={col.id}
-                                                                  type="button"
-                                                                  onClick={() => {
-                                                                    const newSelected = isChecked
-                                                                      ? splitPopover.selectedCols.filter((id) => id !== col.id)
-                                                                      : [...splitPopover.selectedCols, col.id];
-                                                                    setSplitPopover((prev) => prev ? { ...prev, selectedCols: newSelected } : null);
-                                                                    applyCustomSplit(trip.id, entry.id, 'exclude', newSelected);
-                                                                  }}
-                                                                  className={`w-full flex items-center justify-between p-1.5 rounded-lg border text-xs transition-colors ${
-                                                                    isChecked
-                                                                      ? 'border-red-300 bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 font-bold'
-                                                                      : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
-                                                                  }`}
-                                                                >
-                                                                  <span className="truncate">{col.name}</span>
-                                                                  {isChecked ? (
-                                                                    <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.2 rounded font-bold">Excluded</span>
-                                                                  ) : (
-                                                                    <span className="text-[9px] text-gray-400 font-normal">Included</span>
-                                                                  )}
-                                                                </button>
-                                                              );
-                                                            })}
-                                                        </div>
-                                                        <button
-                                                          type="button"
-                                                          onClick={() => setSplitPopover(null)}
-                                                          className="w-full mt-1 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs"
-                                                        >
-                                                          <UserX className="w-3.5 h-3.5" />
-                                                          Done Exclude Split
-                                                        </button>
-                                                      </div>
-                                                    )}
-
-                                                    {/* Tab 3: Include Only Members */}
-                                                    {splitPopover.mode === 'include' && (
-                                                      <div className="space-y-2">
-                                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-                                                          Check members to <strong className="text-emerald-600 dark:text-emerald-400">INCLUDE ONLY</strong>:
-                                                        </p>
-                                                        <div className="space-y-1 max-h-32 overflow-y-auto">
-                                                          {trip.columns
-                                                            .filter((c) => c.type === 'split')
-                                                            .map((col) => {
-                                                              const isChecked = splitPopover.selectedCols.includes(col.id);
-                                                              return (
-                                                                <button
-                                                                  key={col.id}
-                                                                  type="button"
-                                                                  onClick={() => {
-                                                                    const newSelected = isChecked
-                                                                      ? splitPopover.selectedCols.filter((id) => id !== col.id)
-                                                                      : [...splitPopover.selectedCols, col.id];
-                                                                    setSplitPopover((prev) => prev ? { ...prev, selectedCols: newSelected } : null);
-                                                                    applyCustomSplit(trip.id, entry.id, 'include', newSelected);
-                                                                  }}
-                                                                  className={`w-full flex items-center justify-between p-1.5 rounded-lg border text-xs transition-colors ${
-                                                                    isChecked
-                                                                      ? 'border-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold'
-                                                                      : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
-                                                                  }`}
-                                                                >
-                                                                  <span className="truncate">{col.name}</span>
-                                                                  {isChecked ? (
-                                                                    <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.2 rounded font-bold">Included</span>
-                                                                  ) : (
-                                                                    <span className="text-[9px] text-gray-400 font-normal">Excluded</span>
-                                                                  )}
-                                                                </button>
-                                                              );
-                                                            })}
-                                                        </div>
-                                                        <button
-                                                          type="button"
-                                                          onClick={() => setSplitPopover(null)}
-                                                          className="w-full mt-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs"
-                                                        >
-                                                          <UserCheck className="w-3.5 h-3.5" />
-                                                          Done Include Split
-                                                        </button>
-                                                      </div>
-                                                    )}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
 
                                             <button
                                               onClick={() => cancelEditEntry(trip.id, entry.id)}
@@ -1832,7 +1584,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                   if (col.type === 'number' || col.type === 'split') {
                                     return (
                                       <td key={`total-${col.id}`} className="px-4 py-3 text-xs">
-                                        ${tripTotals[col.id]?.toFixed(2) || '0.00'}
+                                        ₹{tripTotals[col.id]?.toFixed(2) || '0.00'}
                                       </td>
                                     );
                                   }
@@ -1888,6 +1640,445 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
           onCancel={() => setConfirmDelete(null)}
         />
       )}
+
+      {/* Portaled Cell Time Popover (isolated from table scrollbars) */}
+      {typeof document !== 'undefined' && cellTimePopover && createPortal(
+        <>
+          {/* Mobile Backdrop Overlay */}
+          <div
+            className="fixed inset-0 bg-black/40 z-[9998] sm:hidden backdrop-blur-xs"
+            onClick={() => setCellTimePopover(null)}
+          />
+          <div
+            ref={cellTimePopoverRef}
+            style={getFloatingPopoverStyle(cellTimePopover.anchorRect, 280)}
+            onClick={(e) => e.stopPropagation()}
+            className="fixed z-[9999] inset-x-3 top-1/2 -translate-y-1/2 sm:translate-y-0 sm:inset-auto max-w-xs sm:max-w-none sm:w-[280px] mx-auto sm:mx-0 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-violet-200 dark:border-violet-700/70 p-3.5 text-left animate-in fade-in duration-100"
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-1.5 mb-2.5">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-gray-200">
+                <Clock className="w-3.5 h-3.5 text-violet-500" />
+                <span>Timing Selection</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCellTimePopover(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-0.5 rounded cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700/60 p-0.5 mb-2.5 text-[11px] font-medium">
+              <button
+                type="button"
+                onClick={() => setCellTimePopover((p) => p ? { ...p, mode: 'range' } : null)}
+                className={`flex-1 py-1 rounded-md transition-colors text-center cursor-pointer ${
+                  cellTimePopover.mode === 'range'
+                    ? 'bg-white dark:bg-gray-800 text-violet-600 dark:text-violet-400 shadow-xs font-semibold'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                }`}
+              >
+                Time Range
+              </button>
+              <button
+                type="button"
+                onClick={() => setCellTimePopover((p) => p ? { ...p, mode: 'single' } : null)}
+                className={`flex-1 py-1 rounded-md transition-colors text-center cursor-pointer ${
+                  cellTimePopover.mode === 'single'
+                    ? 'bg-white dark:bg-gray-800 text-violet-600 dark:text-violet-400 shadow-xs font-semibold'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                }`}
+              >
+                Single Time
+              </button>
+            </div>
+
+            {cellTimePopover.mode === 'range' ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 w-8">From</span>
+                  <select
+                    value={cellTimePopover.fromH}
+                    onChange={(e) => setCellTimePopover((p) => p ? { ...p, fromH: e.target.value } : null)}
+                    className="px-1.5 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <span className="text-gray-400 text-xs font-bold">:</span>
+                  <select
+                    value={cellTimePopover.fromM}
+                    onChange={(e) => setCellTimePopover((p) => p ? { ...p, fromM: e.target.value } : null)}
+                    className="px-1.5 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200"
+                  >
+                    {['00', '15', '30', '45'].map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  <div className="flex rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900 p-0.5 ml-auto">
+                    {(['AM', 'PM'] as const).map((ap) => (
+                      <button
+                        key={ap}
+                        type="button"
+                        onClick={() => setCellTimePopover((p) => p ? { ...p, fromAP: ap } : null)}
+                        className={`px-1.5 py-0.5 text-[10px] font-semibold rounded cursor-pointer transition-colors ${
+                          cellTimePopover.fromAP === ap
+                            ? 'bg-violet-600 text-white shadow-xs'
+                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                        }`}
+                      >
+                        {ap}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 w-8">To</span>
+                  <select
+                    value={cellTimePopover.toH}
+                    onChange={(e) => setCellTimePopover((p) => p ? { ...p, toH: e.target.value } : null)}
+                    className="px-1.5 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <span className="text-gray-400 text-xs font-bold">:</span>
+                  <select
+                    value={cellTimePopover.toM}
+                    onChange={(e) => setCellTimePopover((p) => p ? { ...p, toM: e.target.value } : null)}
+                    className="px-1.5 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200"
+                  >
+                    {['00', '15', '30', '45'].map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  <div className="flex rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900 p-0.5 ml-auto">
+                    {(['AM', 'PM'] as const).map((ap) => (
+                      <button
+                        key={ap}
+                        type="button"
+                        onClick={() => setCellTimePopover((p) => p ? { ...p, toAP: ap } : null)}
+                        className={`px-1.5 py-0.5 text-[10px] font-semibold rounded cursor-pointer transition-colors ${
+                          cellTimePopover.toAP === ap
+                            ? 'bg-violet-600 text-white shadow-xs'
+                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                        }`}
+                      >
+                        {ap}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="text-[11px] font-mono text-center text-violet-600 dark:text-violet-400 py-1 font-semibold bg-violet-50/70 dark:bg-violet-950/40 rounded-md border border-violet-100 dark:border-violet-900/40">
+                  {cellTimePopover.fromH}:{cellTimePopover.fromM} {cellTimePopover.fromAP} – {cellTimePopover.toH}:{cellTimePopover.toM} {cellTimePopover.toAP}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const formattedTime = `${cellTimePopover.fromH}:${cellTimePopover.fromM} ${cellTimePopover.fromAP} – ${cellTimePopover.toH}:${cellTimePopover.toM} ${cellTimePopover.toAP}`;
+                    updateBufferValue(cellTimePopover.tripId, cellTimePopover.entryId, cellTimePopover.colId, formattedTime);
+                    setCellTimePopover(null);
+                  }}
+                  className="w-full py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  Set Timing Range
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 w-8">Time</span>
+                  <select
+                    value={cellTimePopover.singleH}
+                    onChange={(e) => setCellTimePopover((p) => p ? { ...p, singleH: e.target.value } : null)}
+                    className="px-1.5 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <span className="text-gray-400 text-xs font-bold">:</span>
+                  <select
+                    value={cellTimePopover.singleM}
+                    onChange={(e) => setCellTimePopover((p) => p ? { ...p, singleM: e.target.value } : null)}
+                    className="px-1.5 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200"
+                  >
+                    {['00', '15', '30', '45'].map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  <div className="flex rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-900 p-0.5 ml-auto">
+                    {(['AM', 'PM'] as const).map((ap) => (
+                      <button
+                        key={ap}
+                        type="button"
+                        onClick={() => setCellTimePopover((p) => p ? { ...p, singleAP: ap } : null)}
+                        className={`px-1.5 py-0.5 text-[10px] font-semibold rounded cursor-pointer transition-colors ${
+                          cellTimePopover.singleAP === ap
+                            ? 'bg-violet-600 text-white shadow-xs'
+                            : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
+                        }`}
+                      >
+                        {ap}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="text-[11px] font-mono text-center text-violet-600 dark:text-violet-400 py-1 font-semibold bg-violet-50/70 dark:bg-violet-950/40 rounded-md border border-violet-100 dark:border-violet-900/40">
+                  {cellTimePopover.singleH}:{cellTimePopover.singleM} {cellTimePopover.singleAP}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const formattedTime = `${cellTimePopover.singleH}:${cellTimePopover.singleM} ${cellTimePopover.singleAP}`;
+                    updateBufferValue(cellTimePopover.tripId, cellTimePopover.entryId, cellTimePopover.colId, formattedTime);
+                    setCellTimePopover(null);
+                  }}
+                  className="w-full py-1.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  Set Single Time
+                </button>
+              </div>
+            )}
+          </div>
+        </>,
+        document.body
+      )}
+
+      {/* Portaled Split Popover (isolated from table scrollbars) */}
+      {typeof document !== 'undefined' && splitPopover && (() => {
+        const trip = activeState.trips.find((t) => t.id === splitPopover.tripId);
+        if (!trip) return null;
+        const buffer = editBuffers[trip.id]?.[splitPopover.entryId];
+        const splitCols = trip.columns.filter((c) => c.type === 'split');
+        const totalAmt = parseFloat(buffer?.['total_amount'] || '0');
+
+        return createPortal(
+          <>
+            {/* Mobile Backdrop Overlay */}
+            <div
+              className="fixed inset-0 bg-black/40 z-[9998] sm:hidden backdrop-blur-xs"
+              onClick={() => setSplitPopover(null)}
+            />
+            <div
+              ref={splitPopoverRef}
+              style={getFloatingPopoverStyle(splitPopover.anchorRect, 280)}
+              onClick={(e) => e.stopPropagation()}
+              className="fixed z-[9999] inset-x-3 top-1/2 -translate-y-1/2 sm:translate-y-0 sm:inset-auto max-w-xs sm:max-w-none sm:w-[280px] mx-auto sm:mx-0 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-3.5 text-left animate-in fade-in duration-100"
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-1.5 mb-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-gray-200">
+                  <Calculator className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Split Options</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSplitPopover(null)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-0.5 rounded cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {splitCols.length === 0 ? (
+                <div className="text-center py-3 space-y-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    No split members found for this trip.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleAddSplitColumn(trip.id);
+                    }}
+                    className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 mx-auto cursor-pointer shadow-xs"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Add Split Members</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* 3 Menu Items */}
+                  <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700/60 p-0.5 mb-2.5 text-[11px] font-medium">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSplitPopover((prev) => prev ? { ...prev, mode: 'exclude', selectedCols: [] } : null)
+                      }
+                      className={`flex-1 py-1 px-1 rounded-md transition-all text-center cursor-pointer ${
+                        splitPopover.mode === 'exclude'
+                          ? 'bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 shadow-xs font-semibold'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                      }`}
+                    >
+                      1. Exclude
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSplitPopover((prev) => prev ? { ...prev, mode: 'include', selectedCols: [] } : null)
+                      }
+                      className={`flex-1 py-1 px-1 rounded-md transition-all text-center cursor-pointer ${
+                        splitPopover.mode === 'include'
+                          ? 'bg-white dark:bg-gray-800 text-emerald-600 dark:text-emerald-400 shadow-xs font-semibold'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                      }`}
+                    >
+                      2. Include
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSplitPopover((prev) => prev ? { ...prev, mode: 'all' } : null);
+                        applySplitEquallyAll(trip.id, splitPopover.entryId);
+                      }}
+                      className={`flex-1 py-1 px-1 rounded-md transition-all text-center cursor-pointer ${
+                        splitPopover.mode === 'all'
+                          ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-xs font-semibold'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                      }`}
+                    >
+                      3. Equally
+                    </button>
+                  </div>
+
+                  {/* 1. Exclude */}
+                  {splitPopover.mode === 'exclude' && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                        Select members to <strong className="text-red-600 dark:text-red-400">exclude</strong> from the split (₹0.00):
+                      </p>
+                      <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
+                        {splitCols.map((col) => {
+                          const isExcluded = splitPopover.selectedCols.includes(col.id);
+                          return (
+                            <button
+                              key={col.id}
+                              type="button"
+                              onClick={() => {
+                                const newSelected = isExcluded
+                                  ? splitPopover.selectedCols.filter((id) => id !== col.id)
+                                  : [...splitPopover.selectedCols, col.id];
+                                setSplitPopover((prev) => prev ? { ...prev, selectedCols: newSelected } : null);
+                                applyCustomSplit(trip.id, splitPopover.entryId, 'exclude', newSelected);
+                              }}
+                              className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
+                                isExcluded
+                                  ? 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 font-medium'
+                                  : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                              }`}
+                            >
+                              <span className="truncate text-xs">{col.name}</span>
+                              {isExcluded ? (
+                                <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-medium">
+                                  Excluded
+                                </span>
+                              ) : (
+                                <span className="text-[9px] text-gray-400 font-normal">
+                                  Included
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSplitPopover(null)}
+                        className="w-full mt-1 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                      >
+                        <UserX className="w-3.5 h-3.5" />
+                        Done Exclude Split
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 2. Include */}
+                  {splitPopover.mode === 'include' && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                        Select members to <strong className="text-emerald-600 dark:text-emerald-400">include</strong> for the split:
+                      </p>
+                      <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
+                        {splitCols.map((col) => {
+                          const isIncluded = splitPopover.selectedCols.includes(col.id);
+                          return (
+                            <button
+                              key={col.id}
+                              type="button"
+                              onClick={() => {
+                                const newSelected = isIncluded
+                                  ? splitPopover.selectedCols.filter((id) => id !== col.id)
+                                  : [...splitPopover.selectedCols, col.id];
+                                setSplitPopover((prev) => prev ? { ...prev, selectedCols: newSelected } : null);
+                                applyCustomSplit(trip.id, splitPopover.entryId, 'include', newSelected);
+                              }}
+                              className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
+                                isIncluded
+                                  ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-medium'
+                                  : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                              }`}
+                            >
+                              <span className="truncate text-xs">{col.name}</span>
+                              {isIncluded ? (
+                                <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.5 rounded font-medium">
+                                  Included
+                                </span>
+                              ) : (
+                                <span className="text-[9px] text-gray-400 font-normal">
+                                  Excluded
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSplitPopover(null)}
+                        className="w-full mt-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        Done Include Split
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 3. Split equally */}
+                  {splitPopover.mode === 'all' && (
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                        Splits ₹{totalAmt.toFixed(2)} equally across all {splitCols.length} split members (
+                        {splitCols.length > 0 && totalAmt > 0 ? `₹${(totalAmt / splitCols.length).toFixed(2)}` : '₹0.00'} each).
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          applySplitEquallyAll(trip.id, splitPopover.entryId);
+                          setSplitPopover(null);
+                        }}
+                        className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                      >
+                        <Zap className="w-3.5 h-3.5" />
+                        Split Equally to All
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </>,
+          document.body
+        );
+      })()}
     </div>
   );
 }

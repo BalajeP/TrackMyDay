@@ -303,10 +303,47 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
     columnId?: string;
     columnName?: string;
   } | null>(null);
+  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
+  const [titleEditValue, setTitleEditValue] = useState('');
+
+  const startEditingTitle = (categoryId: string, currentTitle: string) => {
+    setEditingTitleId(categoryId);
+    setTitleEditValue(currentTitle);
+  };
+
+  const saveCategoryTitle = (categoryId: string) => {
+    if (!titleEditValue.trim()) return;
+    setCategories(categories.map((c) => (c.id === categoryId ? { ...c, name: titleEditValue.trim() } : c)));
+    setEditingTitleId(null);
+    setTitleEditValue('');
+  };
+
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  const toggleExpanded = (categoryId: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [categoryId]: !prev[categoryId],
+    }));
+  };
+
+  const isCategoryExpanded = (categoryId: string) => {
+    return Boolean(expandedCategories[categoryId]);
+  };
 
   useEffect(() => {
     onUnsavedChanges?.(hasUnsavedChanges, () => { saveCategories(); });
   }, [hasUnsavedChanges]);
+
+  // Auto-save changes to Supabase database so data is always saved
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      const timer = setTimeout(() => {
+        saveCategories();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [categories, hasUnsavedChanges, saveCategories]);
 
   const handleSave = () => {
     saveCategories();
@@ -318,16 +355,17 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
     if (!newCategoryName.trim()) return;
     const newCategory: TrackingCategory = {
       id: Date.now().toString(),
-      name: newCategoryName,
+      name: newCategoryName.trim(),
       columns: [
         { id: 'date', name: 'Date', type: 'date' },
         { id: 'amount', name: 'Amount/Reading', type: 'text' },
       ],
       entries: [],
-      expanded: true,
+      expanded: false,
       person: activePerson === 'both' ? 'both' : activePerson,
     };
     setCategories([...categories, newCategory]);
+    setExpandedCategories((prev) => ({ ...prev, [newCategory.id]: true }));
     setNewCategoryName('');
   };
 
@@ -338,12 +376,13 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
   const deleteCategory = (categoryId: string) => {
     if (confirmDelete?.type === 'category' && confirmDelete.categoryId === categoryId) {
       setCategories(categories.filter((c) => c.id !== categoryId));
+      setExpandedCategories((prev) => {
+        const next = { ...prev };
+        delete next[categoryId];
+        return next;
+      });
       setConfirmDelete(null);
     }
-  };
-
-  const toggleExpanded = (categoryId: string) => {
-    setCategories(categories.map((c) => (c.id === categoryId ? { ...c, expanded: !c.expanded } : c)));
   };
 
   // New entry inserted at top, immediately in edit mode
@@ -487,34 +526,34 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
         <button
           onClick={handleSave}
           disabled={!hasUnsavedChanges}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${
             showSaved
               ? 'bg-green-100 text-green-700 border border-green-300'
               : hasUnsavedChanges
-              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+              ? 'bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer shadow-xs'
               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
           }`}
         >
           <Save className="w-4 h-4" />
-          {showSaved ? 'Saved!' : hasUnsavedChanges ? 'Save Tracking' : 'All Saved'}
+          {showSaved ? 'Saved!' : hasUnsavedChanges ? 'Saving...' : 'All Saved'}
         </button>
       </div>
 
       {/* Add new category */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Add New Tracking Category</h2>
-        <div className="flex gap-3">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-5">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">Add New Tracking Category</h2>
+        <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
           <input
             type="text"
             value={newCategoryName}
             onChange={(e) => setNewCategoryName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addCategory()}
             placeholder="e.g., Cylinder, Haircut, Car Service..."
-            className="flex-1 px-4 py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 text-sm"
+            className="flex-1 px-3.5 sm:px-4 py-2 sm:py-2.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 text-xs sm:text-sm"
           />
           <button
             onClick={addCategory}
-            className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 text-sm font-medium"
+            className="px-4 sm:px-5 py-2 sm:py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 text-xs sm:text-sm font-medium cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
             Add Category
@@ -558,44 +597,115 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
             }`}
           >
             {/* Category header */}
-            <div className="flex items-center justify-between px-5 py-4 bg-gray-50 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-700 group/header">
+            <div
+              onClick={() => toggleExpanded(category.id)}
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 sm:px-5 py-3 sm:py-4 bg-gray-50 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-700 gap-2.5 sm:gap-3 group/header cursor-pointer select-none"
+            >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <div
-                  onMouseDown={() => setCanDragId(category.id)}
-                  onMouseUp={() => setCanDragId(null)}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setCanDragId(category.id);
+                  }}
+                  onMouseUp={(e) => {
+                    e.stopPropagation();
+                    setCanDragId(null);
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   className="opacity-0 group-hover/header:opacity-100 transition-opacity cursor-grab flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                   title="Drag to reorder"
                 >
                   <GripVertical className="w-4 h-4" />
                 </div>
                 <button
-                  onClick={() => toggleExpanded(category.id)}
-                  className="flex items-center gap-2 text-gray-900 dark:text-gray-100 font-semibold hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors min-w-0"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleExpanded(category.id);
+                  }}
+                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-500 dark:text-gray-400 transition-colors flex-shrink-0 cursor-pointer"
                 >
-                  {category.expanded ? (
-                    <ChevronDown className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                  {isCategoryExpanded(category.id) ? (
+                    <ChevronDown className="w-5 h-5" />
                   ) : (
-                    <ChevronRight className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                    <ChevronRight className="w-5 h-5" />
                   )}
-                  <span className="truncate">{category.name}</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 font-normal ml-1">
-                    ({category.entries.length} {category.entries.length === 1 ? 'entry' : 'entries'})
-                  </span>
                 </button>
+
+                {editingTitleId === category.id ? (
+                  <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <input
+                      type="text"
+                      value={titleEditValue}
+                      onChange={(e) => setTitleEditValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveCategoryTitle(category.id);
+                        if (e.key === 'Escape') setEditingTitleId(null);
+                      }}
+                      className="px-2.5 py-1 border border-indigo-400 rounded-lg text-xs sm:text-sm font-semibold text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-gray-900 w-full max-w-[200px]"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => saveCategoryTitle(category.id)}
+                      className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 rounded-lg cursor-pointer"
+                      title="Save title"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTitleId(null)}
+                      className="p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg cursor-pointer"
+                      title="Cancel"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 min-w-0 group/title flex-wrap sm:flex-nowrap">
+                    <span
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditingTitle(category.id, category.name);
+                      }}
+                      className="text-gray-900 dark:text-gray-100 font-semibold text-sm sm:text-base hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer truncate"
+                      title="Click to edit title"
+                    >
+                      {category.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEditingTitle(category.id, category.name);
+                      }}
+                      className="opacity-100 sm:opacity-0 sm:group-hover/title:opacity-100 p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-opacity cursor-pointer flex-shrink-0"
+                      title="Edit Category Title"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 font-normal ml-0.5 sm:ml-1 flex-shrink-0">
+                      ({category.entries.length} {category.entries.length === 1 ? 'entry' : 'entries'})
+                    </span>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                {category.expanded && (
+              <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 sm:gap-2 self-end sm:self-auto">
+                {isCategoryExpanded(category.id) && (
                   <>
                     <button
+                      type="button"
                       onClick={() => addEntry(category.id)}
-                      className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1.5 text-xs font-medium"
+                      className="px-2.5 sm:px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1 sm:gap-1.5 text-xs font-medium cursor-pointer shadow-xs"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Add Entry
                     </button>
                     <button
+                      type="button"
                       onClick={() => addColumn(category.id)}
-                      className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1.5 text-xs font-medium"
+                      className="px-2.5 sm:px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-1 sm:gap-1.5 text-xs font-medium cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Add Column
@@ -603,8 +713,10 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                   </>
                 )}
                 <button
+                  type="button"
                   onClick={() => setConfirmDelete({ type: 'category', categoryId: category.id, categoryName: category.name })}
-                  className="p-1.5 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"
+                  className="p-1.5 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                  title="Delete category"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -612,7 +724,7 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
             </div>
 
             {/* Expanded content */}
-            {category.expanded && (
+            {isCategoryExpanded(category.id) && (
               <div className="p-5">
                 {category.entries.length === 0 ? (
                   <div className="text-center py-8 text-gray-400 dark:text-gray-500">
@@ -647,29 +759,31 @@ export default function Tracking({ activePerson, partner1Name, partner2Name, onA
                                   </button>
                                 </div>
                               ) : (
-                                <div className="flex items-center gap-2 group">
-                                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{col.name}</span>
-                                  <button
-                                    onClick={() => startEditingColumn(category.id, col.id, col.name)}
-                                    className="opacity-0 group-hover:opacity-100 p-0.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-opacity"
-                                  >
-                                    <Edit2 className="w-3 h-3" />
-                                  </button>
-                                  {category.columns.length > 2 && (
+                                  <div className="flex items-center gap-2 group">
+                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{col.name}</span>
                                     <button
-                                      onClick={() => setConfirmDelete({
-                                        type: 'column',
-                                        categoryId: category.id,
-                                        categoryName: category.name,
-                                        columnId: col.id,
-                                        columnName: col.name,
-                                      })}
-                                      className="opacity-0 group-hover:opacity-100 p-0.5 text-red-400 hover:text-red-600 dark:hover:text-red-400 transition-opacity"
+                                      onClick={() => startEditingColumn(category.id, col.id, col.name)}
+                                      className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-0.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-opacity cursor-pointer"
+                                      title="Rename column"
                                     >
-                                      <Trash2 className="w-3 h-3" />
+                                      <Edit2 className="w-3 h-3" />
                                     </button>
-                                  )}
-                                </div>
+                                    {category.columns.length > 2 && (
+                                      <button
+                                        onClick={() => setConfirmDelete({
+                                          type: 'column',
+                                          categoryId: category.id,
+                                          categoryName: category.name,
+                                          columnId: col.id,
+                                          columnName: col.name,
+                                        })}
+                                        className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-0.5 text-red-400 hover:text-red-600 dark:hover:text-red-400 transition-opacity cursor-pointer"
+                                        title="Delete column"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </button>
+                                    )}
+                                  </div>
                               )}
                             </th>
                           ))}

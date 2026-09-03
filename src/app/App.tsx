@@ -4,7 +4,7 @@ import {
   Activity,
   Utensils,
   Dumbbell,
-  DollarSign,
+  IndianRupee,
   Users,
   Pencil,
   X,
@@ -1342,7 +1342,7 @@ export default function App() {
   const allTabs = [
     { id: 'activities' as Tab, label: t('activities', lang), icon: Activity },
     { id: 'meals' as Tab, label: t('meals', lang), icon: Utensils },
-    { id: 'expenses' as Tab, label: t('expenses', lang), icon: DollarSign },
+    { id: 'expenses' as Tab, label: t('expenses', lang), icon: IndianRupee },
     { id: 'tracking' as Tab, label: t('tracking', lang), icon: ListChecks },
     { id: 'workout' as Tab, label: t('workout', lang), icon: Dumbbell },
     { id: 'calendar' as Tab, label: t('calendar', lang), icon: Calendar },
