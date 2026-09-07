@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
-import { Plus, Trash2, ChevronDown, ChevronRight, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical, Zap, UserX, UserCheck, Clock, ArrowUp, ArrowDown, Users } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight, ChevronLeft, Search, Edit2, Check, X, FileText, Download, RotateCw, Calculator, Filter, GripVertical, Zap, UserX, UserCheck, Clock, ArrowUp, ArrowDown, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -136,6 +136,44 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [splitPopover]);
+
+  // Horizontal scroll table container refs
+  const tableContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const scrollTable = (tripId: string, direction: 'left' | 'right') => {
+    const el = tableContainerRefs.current[tripId];
+    if (el) {
+      el.scrollBy({ left: direction === 'left' ? -320 : 320, behavior: 'smooth' });
+    }
+  };
+
+  // Search state within Split Popover (for Exclude & Include)
+  const [splitSearch, setSplitSearch] = useState('');
+
+  // Spender selector popover state
+  const [activeSpenderPicker, setActiveSpenderPicker] = useState<{
+    tripId: string;
+    entryId: string;
+    colId: string;
+    anchorRect?: { top: number; left: number; bottom: number; right: number };
+  } | null>(null);
+  const [spenderSearch, setSpenderSearch] = useState('');
+  const spenderPickerRef = useRef<HTMLDivElement>(null);
+
+  // Spender column header filter search state
+  const [headerFilterSearch, setHeaderFilterSearch] = useState('');
+
+  // Close spender picker on outside click
+  useEffect(() => {
+    if (!activeSpenderPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (spenderPickerRef.current && !spenderPickerRef.current.contains(e.target as Node)) {
+        setActiveSpenderPicker(null);
+        setSpenderSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [activeSpenderPicker]);
 
   const getFloatingPopoverStyle = (anchorRect?: { top: number; left: number; bottom: number; right: number }, width = 280) => {
     if (!anchorRect) return {};
@@ -735,6 +773,66 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     return Array.from(spenders);
   }, []);
 
+  // Get candidate spender names for a trip (from split columns, partners, and existing entries)
+  const getSpenderCandidates = useCallback((trip: Trip) => {
+    const list: string[] = [];
+    const seen = new Set<string>();
+
+    // 1. Column names of split members
+    (trip.columns || []).forEach((c) => {
+      if (c.type === 'split' && c.name?.trim()) {
+        const n = c.name.trim();
+        if (!seen.has(n.toLowerCase())) {
+          seen.add(n.toLowerCase());
+          list.push(n);
+        }
+      }
+    });
+
+    // 2. Partner names
+    [partner1Name, partner2Name].forEach((p) => {
+      if (p && p.trim() && !seen.has(p.trim().toLowerCase())) {
+        seen.add(p.trim().toLowerCase());
+        list.push(p.trim());
+      }
+    });
+
+    // 3. Existing spenders entered in this trip
+    (trip.entries || []).forEach((e) => {
+      const s = e.data['spender']?.trim();
+      if (s && !seen.has(s.toLowerCase())) {
+        seen.add(s.toLowerCase());
+        list.push(s);
+      }
+    });
+
+    return list;
+  }, [partner1Name, partner2Name]);
+
+  // Handle selecting or adding a spender
+  const handleSelectSpender = (tripId: string, entryId: string, spenderName: string) => {
+    const isEditing = editingEntries[tripId]?.has(entryId);
+    if (isEditing) {
+      updateBufferValue(tripId, entryId, 'spender', spenderName);
+    } else {
+      setState((prev) => ({
+        ...prev,
+        trips: prev.trips.map((t) => {
+          if (t.id !== tripId) return t;
+          return {
+            ...t,
+            entries: t.entries.map((e) =>
+              e.id === entryId ? { ...e, data: { ...e.data, spender: spenderName } } : e
+            ),
+            updatedAt: new Date().toISOString(),
+          };
+        }),
+      }));
+    }
+    setActiveSpenderPicker(null);
+    setSpenderSearch('');
+  };
+
   // Filter entries by spender
   const getFilteredEntries = useCallback((trip: Trip) => {
     const selectedSpender = spenderFilters[trip.id];
@@ -1100,6 +1198,31 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                           </button>
                         </div>
 
+                        {/* Horizontal Scroll Navigation Controls */}
+                        {trip.columns.length > 4 && (
+                          <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-700/60 p-0.5 rounded-lg border border-gray-200/70 dark:border-gray-600">
+                            <button
+                              type="button"
+                              onClick={() => scrollTable(trip.id, 'left')}
+                              className="p-1 text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors cursor-pointer"
+                              title="Scroll Table Left"
+                            >
+                              <ChevronLeft className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 px-1 select-none">
+                              {trip.columns.length} cols
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => scrollTable(trip.id, 'right')}
+                              className="p-1 text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors cursor-pointer"
+                              title="Scroll Table Right"
+                            >
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+
                         {/* Add Row & Column & Add Timing */}
                         <button
                           onClick={() => handleAddEntry(trip.id)}
@@ -1173,150 +1296,206 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                           <p className="text-xs">No expenses entered for this trip. Click "Add Row" to start.</p>
                         </div>
                       ) : (
-                        <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-xl">
-                          <table className="w-full border-collapse">
-                            <thead>
-                              <tr className="bg-gray-50/75 dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-700">
-                                {trip.columns.map((col) => (
-                                  <th key={col.id} className="px-4 py-2.5 text-left min-w-[110px]">
-                                    {editingColumn?.tripId === trip.id && editingColumn?.columnId === col.id ? (
-                                      <div className="flex items-center gap-1">
-                                        <input
-                                          type="text"
-                                          value={columnEditValue}
-                                          onChange={(e) => setColumnEditValue(e.target.value)}
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter') saveColumnName();
-                                            if (e.key === 'Escape') setEditingColumn(null);
-                                          }}
-                                          className="px-2 py-1 border border-indigo-400 dark:border-indigo-500 rounded-lg text-xs font-semibold w-24 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                                          autoFocus
-                                        />
-                                        <button
-                                          onClick={saveColumnName}
-                                          className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 rounded"
-                                        >
-                                          <Check className="w-3 h-3" />
-                                        </button>
-                                        <button
-                                          onClick={() => setEditingColumn(null)}
-                                          className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                                        >
-                                          <X className="w-3 h-3" />
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center justify-between group relative">
-                                        <div className="flex items-center gap-1.5 min-w-0">
-                                          <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
-                                            {col.name}
-                                          </span>
-                                          
-                                          {col.type === 'date' && (
-                                            <button
-                                              type="button"
-                                              onClick={() => toggleTripDateSortOrder(trip.id)}
-                                              className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer text-indigo-600 dark:text-indigo-400 flex items-center"
-                                              title={`Date Order: ${getTripDateSortOrder(trip.id) === 'desc' ? 'Descending (Click for Ascending)' : 'Ascending (Click for Descending)'}`}
-                                            >
-                                              {getTripDateSortOrder(trip.id) === 'desc' ? (
-                                                <ArrowDown className="w-3.5 h-3.5" />
-                                              ) : (
-                                                <ArrowUp className="w-3.5 h-3.5" />
-                                              )}
-                                            </button>
-                                          )}
+                        <div className="relative group/table-container">
+                          {/* Floating Left / Right navigation buttons on wide tables */}
+                          {trip.columns.length > 4 && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => scrollTable(trip.id, 'left')}
+                                className="absolute left-1 top-1/2 -translate-y-1/2 z-30 w-7 h-7 rounded-full bg-white/95 dark:bg-gray-800/95 shadow-md border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all opacity-70 hover:opacity-100 hover:scale-110 cursor-pointer"
+                                title="Scroll Left"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => scrollTable(trip.id, 'right')}
+                                className="absolute right-28 top-1/2 -translate-y-1/2 z-30 w-7 h-7 rounded-full bg-white/95 dark:bg-gray-800/95 shadow-md border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all opacity-70 hover:opacity-100 hover:scale-110 cursor-pointer"
+                                title="Scroll Right"
+                              >
+                                <ChevronRight className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
 
-                                          {col.id === 'spender' && (
-                                            <div ref={showFilterMenuId === trip.id ? activeMenuRef : null} className="relative inline-block">
+                          <div
+                            ref={(el) => { tableContainerRefs.current[trip.id] = el; }}
+                            className="overflow-x-auto overflow-y-auto max-h-[70vh] border border-gray-200 dark:border-gray-700 rounded-xl scrollbar-thin relative"
+                          >
+                            <table className="w-full border-collapse">
+                              <thead className="sticky top-0 z-20 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-xs">
+                                <tr className="bg-gray-50/95 dark:bg-gray-900/95 border-b border-gray-200 dark:border-gray-700">
+                                  {trip.columns.map((col) => (
+                                    <th
+                                      key={col.id}
+                                      className="sticky top-0 z-20 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-xs px-4 py-2.5 text-left min-w-[110px] border-b border-gray-200 dark:border-gray-700"
+                                    >
+                                      {editingColumn?.tripId === trip.id && editingColumn?.columnId === col.id ? (
+                                        <div className="flex items-center gap-1">
+                                          <input
+                                            type="text"
+                                            value={columnEditValue}
+                                            onChange={(e) => setColumnEditValue(e.target.value)}
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') saveColumnName();
+                                              if (e.key === 'Escape') setEditingColumn(null);
+                                            }}
+                                            className="px-2 py-1 border border-indigo-400 dark:border-indigo-500 rounded-lg text-xs font-semibold w-24 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                                            autoFocus
+                                          />
+                                          <button
+                                            onClick={saveColumnName}
+                                            className="p-1 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/40 rounded"
+                                          >
+                                            <Check className="w-3 h-3" />
+                                          </button>
+                                          <button
+                                            onClick={() => setEditingColumn(null)}
+                                            className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center justify-between group relative">
+                                          <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider truncate">
+                                              {col.name}
+                                            </span>
+                                            
+                                            {col.type === 'date' && (
                                               <button
-                                                onClick={() => setShowFilterMenuId(showFilterMenuId === trip.id ? null : trip.id)}
-                                                className={`p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer ${
-                                                  spenderFilters[trip.id] && spenderFilters[trip.id] !== 'all'
-                                                    ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
-                                                    : 'text-gray-400 dark:text-gray-500'
-                                                }`}
-                                                title="Filter by Spender"
+                                                type="button"
+                                                onClick={() => toggleTripDateSortOrder(trip.id)}
+                                                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer text-indigo-600 dark:text-indigo-400 flex items-center"
+                                                title={`Date Order: ${getTripDateSortOrder(trip.id) === 'desc' ? 'Descending (Click for Ascending)' : 'Ascending (Click for Descending)'}`}
                                               >
-                                                <Filter className="w-3.5 h-3.5" />
+                                                {getTripDateSortOrder(trip.id) === 'desc' ? (
+                                                  <ArrowDown className="w-3.5 h-3.5" />
+                                                ) : (
+                                                  <ArrowUp className="w-3.5 h-3.5" />
+                                                )}
                                               </button>
-                                              
-                                              {showFilterMenuId === trip.id && (
-                                                <div className="absolute left-0 mt-1.5 z-40 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1.5 min-w-[145px] animate-in fade-in duration-100">
-                                                  <p className="px-3.5 py-1 text-xxs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700 pb-1 mb-1 text-left">
-                                                    Filter Spender
-                                                  </p>
-                                                  <button
-                                                    onClick={() => {
-                                                      setSpenderFilters((prev) => ({ ...prev, [trip.id]: 'all' }));
-                                                      setShowFilterMenuId(null);
-                                                    }}
-                                                    className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
-                                                      !spenderFilters[trip.id] || spenderFilters[trip.id] === 'all'
-                                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 font-bold'
-                                                        : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                                                    }`}
-                                                  >
-                                                    All Spenders
-                                                  </button>
-                                                  {getSpendersForTrip(trip).map((spender) => (
+                                            )}
+
+                                            {col.id === 'spender' && (
+                                              <div ref={showFilterMenuId === trip.id ? activeMenuRef : null} className="relative inline-block">
+                                                <button
+                                                  onClick={() => setShowFilterMenuId(showFilterMenuId === trip.id ? null : trip.id)}
+                                                  className={`p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer ${
+                                                    spenderFilters[trip.id] && spenderFilters[trip.id] !== 'all'
+                                                      ? 'text-indigo-600 dark:text-indigo-400 font-bold bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
+                                                      : 'text-gray-400 dark:text-gray-500'
+                                                  }`}
+                                                  title="Filter by Spender"
+                                                >
+                                                  <Filter className="w-3.5 h-3.5" />
+                                                </button>
+                                                
+                                                {showFilterMenuId === trip.id && (
+                                                  <div className="absolute left-0 mt-1.5 z-40 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1.5 min-w-[165px] animate-in fade-in duration-100">
+                                                    <p className="px-3.5 py-1 text-xxs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700 pb-1 mb-1 text-left">
+                                                      Filter Spender
+                                                    </p>
+                                                    <div className="px-2 pb-1.5">
+                                                      <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md">
+                                                        <Search className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                                        <input
+                                                          type="text"
+                                                          placeholder="Search spender..."
+                                                          value={headerFilterSearch}
+                                                          onChange={(e) => setHeaderFilterSearch(e.target.value)}
+                                                          className="w-full text-xs bg-transparent text-gray-800 dark:text-gray-200 focus:outline-none"
+                                                        />
+                                                        {headerFilterSearch && (
+                                                          <button
+                                                            type="button"
+                                                            onClick={() => setHeaderFilterSearch('')}
+                                                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                                          >
+                                                            <X className="w-2.5 h-2.5" />
+                                                          </button>
+                                                        )}
+                                                      </div>
+                                                    </div>
                                                     <button
-                                                      key={spender}
                                                       onClick={() => {
-                                                        setSpenderFilters((prev) => ({ ...prev, [trip.id]: spender }));
+                                                        setSpenderFilters((prev) => ({ ...prev, [trip.id]: 'all' }));
                                                         setShowFilterMenuId(null);
+                                                        setHeaderFilterSearch('');
                                                       }}
-                                                      className={`w-full text-left px-3.5 py-2 text-xs font-medium transition-colors cursor-pointer truncate ${
-                                                        spenderFilters[trip.id] === spender
+                                                      className={`w-full text-left px-3.5 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                                                        !spenderFilters[trip.id] || spenderFilters[trip.id] === 'all'
                                                           ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 font-bold'
                                                           : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
                                                       }`}
-                                                      title={spender}
                                                     >
-                                                      {spender}
+                                                      All Spenders
                                                     </button>
-                                                  ))}
-                                                </div>
-                                              )}
-                                            </div>
-                                          )}
-                                        </div>
+                                                    <div className="max-h-36 overflow-y-auto">
+                                                      {getSpenderCandidates(trip)
+                                                        .filter((s) => s.toLowerCase().includes(headerFilterSearch.toLowerCase()))
+                                                        .map((spender) => (
+                                                          <button
+                                                            key={spender}
+                                                            onClick={() => {
+                                                              setSpenderFilters((prev) => ({ ...prev, [trip.id]: spender }));
+                                                              setShowFilterMenuId(null);
+                                                              setHeaderFilterSearch('');
+                                                            }}
+                                                            className={`w-full text-left px-3.5 py-1.5 text-xs font-medium transition-colors cursor-pointer truncate ${
+                                                              spenderFilters[trip.id] === spender
+                                                                ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 font-bold'
+                                                                : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                                            }`}
+                                                            title={spender}
+                                                          >
+                                                            {spender}
+                                                          </button>
+                                                        ))}
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
 
-                                        <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                          <button
-                                            onClick={() => startEditingColumn(trip.id, col.id, col.name)}
-                                            className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400"
-                                            title="Rename column"
-                                          >
-                                            <Edit2 className="w-3.5 h-3.5" />
-                                          </button>
-                                          {!isCoreColumn(col.id) && (
+                                          <div className="flex items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                             <button
-                                              onClick={() =>
-                                                setConfirmDelete({
-                                                  type: 'column',
-                                                  tripId: trip.id,
-                                                  columnId: col.id,
-                                                  columnName: col.name
-                                                })
-                                              }
-                                              className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
-                                              title="Delete column"
+                                              onClick={() => startEditingColumn(trip.id, col.id, col.name)}
+                                              className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400"
+                                              title="Rename column"
                                             >
-                                              <Trash2 className="w-3.5 h-3.5" />
+                                              <Edit2 className="w-3.5 h-3.5" />
                                             </button>
-                                          )}
+                                            {!isCoreColumn(col.id) && (
+                                              <button
+                                                onClick={() =>
+                                                  setConfirmDelete({
+                                                    type: 'column',
+                                                    tripId: trip.id,
+                                                    columnId: col.id,
+                                                    columnName: col.name
+                                                  })
+                                                }
+                                                className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400"
+                                                title="Delete column"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            )}
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
+                                    </th>
+                                  ))}
+                                  <th className="sticky top-0 right-0 z-30 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-xs px-4 py-2.5 text-center w-24 min-w-[96px] text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-l border-gray-200 dark:border-gray-700 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.12)]">
+                                    Actions
                                   </th>
-                                ))}
-                                <th className="px-4 py-2.5 text-center w-24 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                  Actions
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                               {filteredEntries.map((entry) => {
                                 const isEditing = editingEntries[trip.id]?.has(entry.id);
                                 const buffer = editBuffers[trip.id]?.[entry.id];
@@ -1409,6 +1588,26 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                     className="w-full pl-5 pr-1.5 py-1.5 border border-indigo-200 dark:border-indigo-700 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                                   />
                                                 </div>
+                                              ) : col.id === 'spender' ? (
+                                                  <div className="relative min-w-[130px]">
+                                                    <div
+                                                      onClick={(e) => {
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        setSpenderSearch('');
+                                                        setActiveSpenderPicker(
+                                                          activeSpenderPicker?.tripId === trip.id && activeSpenderPicker?.entryId === entry.id && activeSpenderPicker?.colId === col.id
+                                                            ? null
+                                                            : { tripId: trip.id, entryId: entry.id, colId: col.id, anchorRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right } }
+                                                        );
+                                                      }}
+                                                      className="w-full flex items-center justify-between px-2.5 py-1.5 border border-indigo-200 dark:border-indigo-700 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500 shadow-2xs"
+                                                    >
+                                                      <span className={value ? 'truncate font-medium' : 'text-gray-400 dark:text-gray-500 italic'}>
+                                                        {value || 'Select Spender...'}
+                                                      </span>
+                                                      <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0 ml-1" />
+                                                    </div>
+                                                  </div>
                                               ) : col.type === 'time' ? (
                                                 <div className="relative min-w-[140px]">
                                                   <input
@@ -1498,6 +1697,28 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                                 ) : (
                                                   <span className="text-gray-300 dark:text-gray-600 italic">—</span>
                                                 )
+                                              ) : col.id === 'spender' ? (
+                                                  <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      const rect = e.currentTarget.getBoundingClientRect();
+                                                      setSpenderSearch('');
+                                                      setActiveSpenderPicker({
+                                                        tripId: trip.id,
+                                                        entryId: entry.id,
+                                                        colId: col.id,
+                                                        anchorRect: { top: rect.top, left: rect.left, bottom: rect.bottom, right: rect.right }
+                                                      });
+                                                    }}
+                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left group/sp cursor-pointer"
+                                                    title="Click to select or change spender"
+                                                  >
+                                                    <span className={value ? "font-medium text-gray-800 dark:text-gray-200" : "text-gray-400 dark:text-gray-500 italic"}>
+                                                      {value || 'Assign Spender'}
+                                                    </span>
+                                                    <ChevronDown className="w-3 h-3 text-gray-400 opacity-0 group-hover/sp:opacity-100 transition-opacity" />
+                                                  </button>
                                               ) : (
                                                 value || <span className="text-gray-300 dark:text-gray-600 italic">—</span>
                                               )}
@@ -1508,7 +1729,13 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                     })}
 
                                     {/* Action items */}
-                                    <td className="px-4 py-2.5 text-center">
+                                    <td
+                                      className={`sticky right-0 z-10 px-4 py-2.5 text-center border-l border-gray-200 dark:border-gray-700 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.12)] ${
+                                        isEditing
+                                          ? 'bg-indigo-50/95 dark:bg-indigo-950/95'
+                                          : 'bg-white dark:bg-gray-800 group-hover:bg-gray-50 dark:group-hover:bg-gray-750'
+                                      }`}
+                                    >
                                       <div className="flex items-center justify-center gap-1.5">
                                         {isEditing ? (
                                           <>
@@ -1595,11 +1822,12 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                     </td>
                                   );
                                 })}
-                                <td key="total-actions-spacer" className="px-4 py-3"></td>
+                                <td key="total-actions-spacer" className="sticky right-0 z-10 px-4 py-3 bg-indigo-50 dark:bg-indigo-950 border-l border-indigo-200 dark:border-indigo-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.12)]"></td>
                               </tr>
                             </tbody>
                           </table>
                         </div>
+                      </div>
                       )}
                     </div>
                   )}
@@ -1953,46 +2181,96 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                   {/* 1. Exclude */}
                   {splitPopover.mode === 'exclude' && (
                     <div className="space-y-2">
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
-                        Select members to <strong className="text-red-600 dark:text-red-400">exclude</strong> from the split (₹0.00):
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                          Select members to <strong className="text-red-600 dark:text-red-400">exclude</strong> (₹0.00):
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allIds = splitCols.map((c) => c.id);
+                              setSplitPopover((prev) => prev ? { ...prev, selectedCols: allIds } : null);
+                              applyCustomSplit(trip.id, splitPopover.entryId, 'exclude', allIds);
+                            }}
+                            className="text-red-600 hover:underline cursor-pointer font-medium"
+                          >
+                            All
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSplitPopover((prev) => prev ? { ...prev, selectedCols: [] } : null);
+                              applyCustomSplit(trip.id, splitPopover.entryId, 'exclude', []);
+                            }}
+                            className="text-gray-500 hover:underline cursor-pointer"
+                          >
+                            None
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Search box for Exclude */}
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Search member to exclude..."
+                          value={splitSearch}
+                          onChange={(e) => setSplitSearch(e.target.value)}
+                          className="w-full pl-7 pr-6 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        {splitSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setSplitSearch('')}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
                       <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
-                        {splitCols.map((col) => {
-                          const isExcluded = splitPopover.selectedCols.includes(col.id);
-                          return (
-                            <button
-                              key={col.id}
-                              type="button"
-                              onClick={() => {
-                                const newSelected = isExcluded
-                                  ? splitPopover.selectedCols.filter((id) => id !== col.id)
-                                  : [...splitPopover.selectedCols, col.id];
-                                setSplitPopover((prev) => prev ? { ...prev, selectedCols: newSelected } : null);
-                                applyCustomSplit(trip.id, splitPopover.entryId, 'exclude', newSelected);
-                              }}
-                              className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
-                                isExcluded
-                                  ? 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 font-medium'
-                                  : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                              }`}
-                            >
-                              <span className="truncate text-xs">{col.name}</span>
-                              {isExcluded ? (
-                                <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-medium">
-                                  Excluded
-                                </span>
-                              ) : (
-                                <span className="text-[9px] text-gray-400 font-normal">
-                                  Included
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
+                        {splitCols
+                          .filter((c) => c.name.toLowerCase().includes(splitSearch.toLowerCase()))
+                          .map((col) => {
+                            const isExcluded = splitPopover.selectedCols.includes(col.id);
+                            return (
+                              <button
+                                key={col.id}
+                                type="button"
+                                onClick={() => {
+                                  const newSelected = isExcluded
+                                    ? splitPopover.selectedCols.filter((id) => id !== col.id)
+                                    : [...splitPopover.selectedCols, col.id];
+                                  setSplitPopover((prev) => prev ? { ...prev, selectedCols: newSelected } : null);
+                                  applyCustomSplit(trip.id, splitPopover.entryId, 'exclude', newSelected);
+                                }}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
+                                  isExcluded
+                                    ? 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 font-medium'
+                                    : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                }`}
+                              >
+                                <span className="truncate text-xs">{col.name}</span>
+                                {isExcluded ? (
+                                  <span className="text-[9px] bg-red-600 text-white px-1.5 py-0.5 rounded font-medium">
+                                    Excluded
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] text-gray-400 font-normal">
+                                    Included
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
                       </div>
                       <button
                         type="button"
-                        onClick={() => setSplitPopover(null)}
+                        onClick={() => { setSplitPopover(null); setSplitSearch(''); }}
                         className="w-full mt-1 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs cursor-pointer"
                       >
                         <UserX className="w-3.5 h-3.5" />
@@ -2004,46 +2282,96 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                   {/* 2. Include */}
                   {splitPopover.mode === 'include' && (
                     <div className="space-y-2">
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
-                        Select members to <strong className="text-emerald-600 dark:text-emerald-400">include</strong> for the split:
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                          Select members to <strong className="text-emerald-600 dark:text-emerald-400">include</strong> for the split:
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const allIds = splitCols.map((c) => c.id);
+                              setSplitPopover((prev) => prev ? { ...prev, selectedCols: allIds } : null);
+                              applyCustomSplit(trip.id, splitPopover.entryId, 'include', allIds);
+                            }}
+                            className="text-emerald-600 hover:underline cursor-pointer font-medium"
+                          >
+                            All
+                          </button>
+                          <span className="text-gray-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSplitPopover((prev) => prev ? { ...prev, selectedCols: [] } : null);
+                              applyCustomSplit(trip.id, splitPopover.entryId, 'include', []);
+                            }}
+                            className="text-gray-500 hover:underline cursor-pointer"
+                          >
+                            None
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Search box for Include */}
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Search member to include..."
+                          value={splitSearch}
+                          onChange={(e) => setSplitSearch(e.target.value)}
+                          className="w-full pl-7 pr-6 py-1 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        {splitSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setSplitSearch('')}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
                       <div className="space-y-1 max-h-36 overflow-y-auto pr-0.5">
-                        {splitCols.map((col) => {
-                          const isIncluded = splitPopover.selectedCols.includes(col.id);
-                          return (
-                            <button
-                              key={col.id}
-                              type="button"
-                              onClick={() => {
-                                const newSelected = isIncluded
-                                  ? splitPopover.selectedCols.filter((id) => id !== col.id)
-                                  : [...splitPopover.selectedCols, col.id];
-                                setSplitPopover((prev) => prev ? { ...prev, selectedCols: newSelected } : null);
-                                applyCustomSplit(trip.id, splitPopover.entryId, 'include', newSelected);
-                              }}
-                              className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
-                                isIncluded
-                                  ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-medium'
-                                  : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                              }`}
-                            >
-                              <span className="truncate text-xs">{col.name}</span>
-                              {isIncluded ? (
-                                <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.5 rounded font-medium">
-                                  Included
-                                </span>
-                              ) : (
-                                <span className="text-[9px] text-gray-400 font-normal">
-                                  Excluded
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
+                        {splitCols
+                          .filter((c) => c.name.toLowerCase().includes(splitSearch.toLowerCase()))
+                          .map((col) => {
+                            const isIncluded = splitPopover.selectedCols.includes(col.id);
+                            return (
+                              <button
+                                key={col.id}
+                                type="button"
+                                onClick={() => {
+                                  const newSelected = isIncluded
+                                    ? splitPopover.selectedCols.filter((id) => id !== col.id)
+                                    : [...splitPopover.selectedCols, col.id];
+                                  setSplitPopover((prev) => prev ? { ...prev, selectedCols: newSelected } : null);
+                                  applyCustomSplit(trip.id, splitPopover.entryId, 'include', newSelected);
+                                }}
+                                className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
+                                  isIncluded
+                                    ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-medium'
+                                    : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                }`}
+                              >
+                                <span className="truncate text-xs">{col.name}</span>
+                                {isIncluded ? (
+                                  <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.5 rounded font-medium">
+                                    Included
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] text-gray-400 font-normal">
+                                    Excluded
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
                       </div>
                       <button
                         type="button"
-                        onClick={() => setSplitPopover(null)}
+                        onClick={() => { setSplitPopover(null); setSplitSearch(''); }}
                         className="w-full mt-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1 shadow-xs cursor-pointer"
                       >
                         <UserCheck className="w-3.5 h-3.5" />
@@ -2074,6 +2402,110 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                   )}
                 </>
               )}
+            </div>
+          </>,
+          document.body
+        );
+      })()}
+
+      {/* Portaled Spender Selection Popover */}
+      {typeof document !== 'undefined' && activeSpenderPicker && (() => {
+        const trip = activeState.trips.find((t) => t.id === activeSpenderPicker.tripId);
+        if (!trip) return null;
+        const candidates = getSpenderCandidates(trip);
+        const q = spenderSearch.trim().toLowerCase();
+        const filtered = candidates.filter((c) => c.toLowerCase().includes(q));
+        const isExactMatch = candidates.some((c) => c.toLowerCase() === q);
+
+        return createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[9998]"
+              onClick={() => {
+                setActiveSpenderPicker(null);
+                setSpenderSearch('');
+              }}
+            />
+            <div
+              ref={spenderPickerRef}
+              style={getFloatingPopoverStyle(activeSpenderPicker.anchorRect, 230)}
+              onClick={(e) => e.stopPropagation()}
+              className="fixed z-[9999] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-2.5 text-left w-[230px] animate-in fade-in duration-100"
+            >
+              <div className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg mb-2">
+                <Search className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search or add spender..."
+                  value={spenderSearch}
+                  onChange={(e) => setSpenderSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && spenderSearch.trim()) {
+                      handleSelectSpender(activeSpenderPicker.tripId, activeSpenderPicker.entryId, spenderSearch.trim());
+                    }
+                  }}
+                  autoFocus
+                  className="w-full text-xs bg-transparent text-gray-800 dark:text-gray-200 focus:outline-none"
+                />
+                {spenderSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setSpenderSearch('')}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Add new spender button if typed string is new */}
+              {spenderSearch.trim() && !isExactMatch && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleSelectSpender(activeSpenderPicker.tripId, activeSpenderPicker.entryId, spenderSearch.trim())
+                  }
+                  className="w-full text-left px-2.5 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 rounded-lg flex items-center gap-1.5 mb-1 transition-colors cursor-pointer border border-dashed border-indigo-200 dark:border-indigo-800"
+                >
+                  <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">Add "{spenderSearch.trim()}"</span>
+                </button>
+              )}
+
+              <div className="max-h-48 overflow-y-auto space-y-0.5 pr-0.5">
+                {filtered.length === 0 && !spenderSearch.trim() && (
+                  <p className="text-xxs text-gray-400 text-center py-2 italic">
+                    No column members or spenders found
+                  </p>
+                )}
+                {filtered.length === 0 && spenderSearch.trim() && isExactMatch && (
+                  <p className="text-xxs text-gray-400 text-center py-2 italic">
+                    No match
+                  </p>
+                )}
+                {filtered.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => handleSelectSpender(activeSpenderPicker.tripId, activeSpenderPicker.entryId, name)}
+                    className="w-full text-left px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg font-medium transition-colors cursor-pointer truncate"
+                    title={name}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Clear Spender button */}
+              <div className="border-t border-gray-100 dark:border-gray-700 mt-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleSelectSpender(activeSpenderPicker.tripId, activeSpenderPicker.entryId, '')}
+                  className="w-full text-left px-2 py-1 text-xxs text-gray-400 hover:text-red-500 rounded transition-colors cursor-pointer"
+                >
+                  Clear Spender
+                </button>
+              </div>
             </div>
           </>,
           document.body

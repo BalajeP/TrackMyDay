@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus,
   Trash2,
@@ -23,6 +24,11 @@ import {
   Clock,
   ArrowUp,
   ArrowDown,
+  ChevronLeft,
+  ChevronRight,
+  Divide,
+  Users,
+  Calculator,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
@@ -298,6 +304,234 @@ export default function Expenditure({
   } | null>(null);
   const [showEditIconPicker, setShowEditIconPicker] = useState<boolean>(false);
   const [editEmojiTab, setEditEmojiTab] = useState<number>(0);
+
+  // Horizontal Scrolling for Modal Table
+  const modalTableContainerRef = useRef<HTMLDivElement>(null);
+  const scrollModalTable = (direction: 'left' | 'right') => {
+    if (modalTableContainerRef.current) {
+      const delta = direction === 'left' ? -350 : 350;
+      modalTableContainerRef.current.scrollBy({ left: delta, behavior: 'smooth' });
+    }
+  };
+
+  const getFloatingPopoverStyle = (
+    anchorRect?: { top: number; left: number; bottom: number; right: number },
+    width = 280
+  ) => {
+    if (!anchorRect) return {};
+    if (typeof window !== 'undefined' && window.innerWidth < 640) return {};
+    const padding = 12;
+    const spaceBelow = typeof window !== 'undefined' ? window.innerHeight - anchorRect.bottom : 500;
+    const top = spaceBelow > 280 ? anchorRect.bottom + 6 : Math.max(padding, anchorRect.top - 270);
+    const left =
+      typeof window !== 'undefined'
+        ? Math.max(padding, Math.min(anchorRect.left, window.innerWidth - width - padding))
+        : anchorRect.left;
+    return {
+      top: `${top}px`,
+      left: `${left}px`,
+    };
+  };
+
+  // Daily Expense Spender Picker State
+  interface DailySpenderPickerState {
+    target: 'add_form' | 'inline_edit';
+    column: string;
+    anchorRect: DOMRect;
+  }
+  const [dailySpenderPicker, setDailySpenderPicker] = useState<DailySpenderPickerState | null>(null);
+  const [dailySpenderSearch, setDailySpenderSearch] = useState<string>('');
+  const dailySpenderPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        dailySpenderPickerRef.current &&
+        !dailySpenderPickerRef.current.contains(e.target as Node)
+      ) {
+        setDailySpenderPicker(null);
+        setDailySpenderSearch('');
+      }
+    };
+    if (dailySpenderPicker) {
+      document.addEventListener('mousedown', handler);
+    }
+    return () => document.removeEventListener('mousedown', handler);
+  }, [dailySpenderPicker]);
+
+  // Daily Expense Split Popover State
+  interface DailySplitPopoverState {
+    target: 'add_form' | 'inline_edit';
+    totalAmount: number;
+    anchorRect: DOMRect;
+  }
+  const [dailySplitPopover, setDailySplitPopover] = useState<DailySplitPopoverState | null>(null);
+  const [dailySplitMode, setDailySplitMode] = useState<'equal' | 'exclude' | 'include'>('equal');
+  const [dailySplitSearch, setDailySplitSearch] = useState<string>('');
+  const [dailySplitSelectedCols, setDailySplitSelectedCols] = useState<string[]>([]);
+  const dailySplitPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        dailySplitPopoverRef.current &&
+        !dailySplitPopoverRef.current.contains(e.target as Node)
+      ) {
+        setDailySplitPopover(null);
+      }
+    };
+    if (dailySplitPopover) {
+      document.addEventListener('mousedown', handler);
+    }
+    return () => document.removeEventListener('mousedown', handler);
+  }, [dailySplitPopover]);
+
+  const getDailySpenderCandidates = useCallback(
+    (expense: Expense): string[] => {
+      const list: string[] = [];
+      if (partner1Name?.trim()) list.push(partner1Name.trim());
+      if (partner2Name?.trim()) list.push(partner2Name.trim());
+      (expense.customColumns || []).forEach((c) => {
+        const trimmed = c.trim();
+        if (
+          trimmed &&
+          !trimmed.toLowerCase().includes('amount') &&
+          !trimmed.toLowerCase().includes('date') &&
+          !trimmed.toLowerCase().includes('detail')
+        ) {
+          if (!list.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+            list.push(trimmed);
+          }
+        }
+      });
+      (expense.items || []).forEach((item) => {
+        if (item.customValues) {
+          Object.entries(item.customValues).forEach(([k, v]) => {
+            const val = (v || '').trim();
+            if (
+              val &&
+              val.length < 40 &&
+              !list.some((s) => s.toLowerCase() === val.toLowerCase())
+            ) {
+              list.push(val);
+            }
+          });
+        }
+      });
+      return list;
+    },
+    [partner1Name, partner2Name]
+  );
+
+  const handleSelectDailySpender = (
+    expenseId: string,
+    target: 'add_form' | 'inline_edit',
+    column: string,
+    spenderName: string
+  ) => {
+    if (target === 'add_form') {
+      setItemForms((prev) => ({
+        ...prev,
+        [expenseId]: {
+          ...(prev[expenseId] || {
+            date: format(new Date(), 'yyyy-MM-dd'),
+            item: '',
+            amount: '',
+            customValues: {},
+          }),
+          customValues: {
+            ...(prev[expenseId]?.customValues || {}),
+            [column]: spenderName,
+          },
+        },
+      }));
+    } else {
+      setEditingItem((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          customValues: {
+            ...(prev.customValues || {}),
+            [column]: spenderName,
+          },
+        };
+      });
+    }
+    setDailySpenderPicker(null);
+    setDailySpenderSearch('');
+  };
+
+  const applyDailySplit = (
+    expenseId: string,
+    target: 'add_form' | 'inline_edit',
+    mode: 'equal' | 'exclude' | 'include',
+    selectedCols: string[],
+    totalAmount: number
+  ) => {
+    const expense = expenses.find((e) => e.id === expenseId);
+    if (!expense || !expense.customColumns || expense.customColumns.length === 0) return;
+
+    const allCols = expense.customColumns;
+    let activeCols: string[] = [];
+    let inactiveCols: string[] = [];
+
+    if (mode === 'equal') {
+      activeCols = [...allCols];
+      inactiveCols = [];
+    } else if (mode === 'exclude') {
+      activeCols = allCols.filter((c) => !selectedCols.includes(c));
+      inactiveCols = allCols.filter((c) => selectedCols.includes(c));
+    } else {
+      activeCols = allCols.filter((c) => selectedCols.includes(c));
+      inactiveCols = allCols.filter((c) => !selectedCols.includes(c));
+    }
+
+    const perPerson =
+      activeCols.length > 0 && totalAmount > 0
+        ? (totalAmount / activeCols.length).toFixed(2)
+        : '0.00';
+
+    if (target === 'add_form') {
+      setItemForms((prev) => {
+        const cur = prev[expenseId] || {
+          date: format(new Date(), 'yyyy-MM-dd'),
+          item: '',
+          amount: totalAmount.toString(),
+          customValues: {},
+        };
+        const newValues = { ...(cur.customValues || {}) };
+        activeCols.forEach((c) => {
+          newValues[c] = perPerson;
+        });
+        inactiveCols.forEach((c) => {
+          newValues[c] = '';
+        });
+        return {
+          ...prev,
+          [expenseId]: {
+            ...cur,
+            customValues: newValues,
+          },
+        };
+      });
+    } else {
+      setEditingItem((prev) => {
+        if (!prev) return null;
+        const newValues = { ...(prev.customValues || {}) };
+        activeCols.forEach((c) => {
+          newValues[c] = perPerson;
+        });
+        inactiveCols.forEach((c) => {
+          newValues[c] = '';
+        });
+        return {
+          ...prev,
+          customValues: newValues,
+        };
+      });
+    }
+    setDailySplitPopover(null);
+  };
 
   // Click Outside Listener for Category Dropdown
   useEffect(() => {
@@ -1749,7 +1983,7 @@ export default function Expenditure({
       {/* Detail View Modal (Opens on card click; prompts deletions IN THE DETAILED VIEW ITSELF!) */}
       {activeDetailExpense && (
         <div className="fixed inset-0 z-[9999] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className={`bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full ${(activeDetailExpense.customColumns || []).length > 2 ? 'max-w-6xl' : 'max-w-3xl'} overflow-hidden animate-in fade-in zoom-in-95 duration-200`}>
             {/* Screenshot Header Bar: Chevron ∨ | Icon + Title + (X entries) | + Add Entry | + Add Column | Trash Icon | Close X */}
             <div className="p-4 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex flex-wrap items-center justify-between gap-3">
               {/* Left Side: Chevron + Icon + Title + (X entries) + Edit Button */}
@@ -1864,8 +2098,15 @@ export default function Expenditure({
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 font-medium flex-shrink-0">
-                      ({(showAllModalHistory ? activeDetailExpense.items || [] : getExpenseFilteredItems(activeDetailExpense)).length} entries)
+                    <span className="text-xs text-gray-400 dark:text-gray-500 font-semibold flex-shrink-0">
+                      (
+                      {
+                        (showAllModalHistory
+                          ? activeDetailExpense.items || []
+                          : getExpenseFilteredItems(activeDetailExpense)
+                        ).length
+                      }{' '}
+                      entries)
                     </span>
                     {formatLastUpdated(activeDetailExpense.updatedAt || activeDetailExpense.date) && (
                       <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium flex items-center gap-1 flex-shrink-0">
@@ -1876,7 +2117,7 @@ export default function Expenditure({
                     <button
                       type="button"
                       onClick={() => setShowAllModalHistory((v) => !v)}
-                      className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold border transition-all ${
+                      className={`ml-2 px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-colors flex-shrink-0 ${
                         showAllModalHistory
                           ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                           : 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
@@ -1889,8 +2130,32 @@ export default function Expenditure({
                 )}
               </div>
 
-              {/* Right Side: + Add Entry (Purple) | + Add Column (Gray) | Red Trash Icon | Close X */}
+              {/* Right Side: Horizontal Scroll Controls | + Add Entry (Purple) | + Add Column (Gray) | Red Trash Icon | Close X */}
               <div className="flex items-center gap-2">
+                {(activeDetailExpense.customColumns || []).length > 2 && (
+                  <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/80 p-0.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                    <button
+                      type="button"
+                      onClick={() => scrollModalTable('left')}
+                      className="p-1 text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors cursor-pointer"
+                      title="Scroll table left"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 px-1 select-none">
+                      cols
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => scrollModalTable('right')}
+                      className="p-1 text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors cursor-pointer"
+                      title="Scroll table right"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setShowAddEntryModal((v) => !v)}
@@ -2056,33 +2321,60 @@ export default function Expenditure({
                     className="flex-1 min-w-[140px] px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   />
 
-                  {/* Custom Column Inputs in Form */}
-                  {(activeDetailExpense.customColumns || []).map((col) => (
-                    <input
-                      key={col}
-                      type="text"
-                      placeholder={col}
-                      value={itemForms[activeDetailExpense.id]?.customValues?.[col] || ''}
-                      onChange={(e) =>
-                        setItemForms((prev) => ({
-                          ...prev,
-                          [activeDetailExpense.id]: {
-                            ...(prev[activeDetailExpense.id] || {
-                              date: format(new Date(), 'yyyy-MM-dd'),
-                              item: '',
-                              amount: '',
-                              customValues: {},
-                            }),
-                            customValues: {
-                              ...(prev[activeDetailExpense.id]?.customValues || {}),
-                              [col]: e.target.value,
-                            },
-                          },
-                        }))
-                      }
-                      className="w-28 px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                    />
-                  ))}
+                  {/* Custom Column Inputs in Form with Spender Selector */}
+                  {(activeDetailExpense.customColumns || []).map((col) => {
+                    const isSpenderCol =
+                      col.toLowerCase().includes('spender') ||
+                      col.toLowerCase().includes('paid') ||
+                      col.toLowerCase().includes('payer');
+                    return (
+                      <div key={col} className="relative flex items-center">
+                        <input
+                          type="text"
+                          placeholder={col}
+                          value={itemForms[activeDetailExpense.id]?.customValues?.[col] || ''}
+                          onChange={(e) =>
+                            setItemForms((prev) => ({
+                              ...prev,
+                              [activeDetailExpense.id]: {
+                                ...(prev[activeDetailExpense.id] || {
+                                  date: format(new Date(), 'yyyy-MM-dd'),
+                                  item: '',
+                                  amount: '',
+                                  customValues: {},
+                                }),
+                                customValues: {
+                                  ...(prev[activeDetailExpense.id]?.customValues || {}),
+                                  [col]: e.target.value,
+                                },
+                              },
+                            }))
+                          }
+                          className={`px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
+                            isSpenderCol ? 'w-36 pr-7' : 'w-28'
+                          }`}
+                        />
+                        {isSpenderCol && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setDailySpenderPicker({
+                                target: 'add_form',
+                                column: col,
+                                anchorRect: rect,
+                              });
+                              setDailySpenderSearch('');
+                            }}
+                            className="absolute right-1.5 p-1 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                            title="Select spender from columns / members"
+                          >
+                            <ChevronDown className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
 
                   <input
                     type="number"
@@ -2108,17 +2400,41 @@ export default function Expenditure({
                     }
                     className="w-28 px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-400 text-right"
                   />
+
+                  {(activeDetailExpense.customColumns || []).length > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const amt = Number(itemForms[activeDetailExpense.id]?.amount) || 0;
+                        setDailySplitPopover({
+                          target: 'add_form',
+                          totalAmount: amt,
+                          anchorRect: rect,
+                        });
+                        setDailySplitMode('equal');
+                        setDailySplitSearch('');
+                        setDailySplitSelectedCols([]);
+                      }}
+                      className="flex items-center gap-1 px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs rounded-lg border border-indigo-200 dark:border-indigo-800 shadow-2xs transition-colors cursor-pointer"
+                      title="Split amount across custom columns"
+                    >
+                      <Divide className="w-3.5 h-3.5" />
+                      <span>Split</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => handleAddLineItem(activeDetailExpense.id)}
-                    className="px-3.5 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm"
+                    className="px-3.5 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm cursor-pointer"
                   >
                     Save Entry
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowAddEntryModal(false)}
-                    className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                    className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -2126,315 +2442,406 @@ export default function Expenditure({
               </div>
             )}
 
-            {/* Modal Body: Screenshot Formatted Table */}
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-100 dark:border-gray-700 text-gray-400 dark:text-gray-400 font-semibold">
-                      <th className="py-2.5 px-3">
-                        <button
-                          type="button"
-                          onClick={() => toggleCategoryDateSortOrder(activeDetailExpense.id)}
-                          className="flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer select-none"
-                          title={`Date Order: ${getCategorySortOrder(activeDetailExpense.id) === 'desc' ? 'Descending (Click to sort Ascending)' : 'Ascending (Click to sort Descending)'}`}
-                        >
-                          <span>Date</span>
-                          {getCategorySortOrder(activeDetailExpense.id) === 'desc' ? (
-                            <ArrowDown className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                          ) : (
-                            <ArrowUp className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                          )}
-                        </button>
-                      </th>
-                      <th className="py-2.5 px-3">Detail</th>
+            {/* Modal Body: Formatted Table with Horizontal Scrolling & Sticky Headers */}
+            <div className="p-4 sm:p-6 space-y-4">
+              <div className="relative group/modal-table">
+                {/* Floating horizontal navigation buttons */}
+                {(activeDetailExpense.customColumns || []).length > 2 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => scrollModalTable('left')}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-25 p-2 bg-white/95 dark:bg-gray-800/95 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-gray-700 dark:text-gray-200 rounded-full shadow-lg border border-gray-200/80 dark:border-gray-700 transition-all opacity-70 hover:opacity-100 hover:scale-110 cursor-pointer backdrop-blur-xs"
+                      title="Scroll columns left"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => scrollModalTable('right')}
+                      className="absolute right-24 top-1/2 -translate-y-1/2 z-25 p-2 bg-white/95 dark:bg-gray-800/95 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-gray-700 dark:text-gray-200 rounded-full shadow-lg border border-gray-200/80 dark:border-gray-700 transition-all opacity-70 hover:opacity-100 hover:scale-110 cursor-pointer backdrop-blur-xs"
+                      title="Scroll columns right"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
 
-                      {/* Dynamic Custom Column Headers */}
-                      {(activeDetailExpense.customColumns || []).map((col) => {
-                        const isEditingCol = editingColumn?.original === col;
-                        const isDeletingCol = confirmColumnDeleteInModal === col;
-
-                        return (
-                          <th key={col} className="py-2.5 px-3">
-                            {isDeletingCol ? (
-                              <div className="flex items-center gap-1 bg-red-50 dark:bg-red-950/60 p-1 rounded">
-                                <span className="text-red-700 dark:text-red-300 font-bold text-[11px]">Delete {col}?</span>
-                                <button
-                                  onClick={() =>
-                                    executeRemoveCustomColumn(activeDetailExpense.id, col)
-                                  }
-                                  className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold"
-                                >
-                                  Yes
-                                </button>
-                                <button
-                                  onClick={() => setConfirmColumnDeleteInModal(null)}
-                                  className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded text-[10px]"
-                                >
-                                  No
-                                </button>
-                              </div>
-                            ) : isEditingCol ? (
-                              <div className="flex items-center gap-1">
-                                <input
-                                  type="text"
-                                  value={editingColumn.text}
-                                  onChange={(e) =>
-                                    setEditingColumn({
-                                      ...editingColumn,
-                                      text: e.target.value,
-                                    })
-                                  }
-                                  onKeyDown={(e) =>
-                                    e.key === 'Enter' &&
-                                    handleSaveEditColumn(activeDetailExpense.id)
-                                  }
-                                  autoFocus
-                                  className="w-24 px-1.5 py-0.5 border border-indigo-300 dark:border-indigo-600 rounded text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none normal-case"
-                                />
-                                <button
-                                  onClick={() => handleSaveEditColumn(activeDetailExpense.id)}
-                                  className="p-0.5 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/40 rounded"
-                                >
-                                  <Check className="w-3 h-3" />
-                                </button>
-                                <button
-                                  onClick={() => setEditingColumn(null)}
-                                  className="p-0.5 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
+                <div
+                  ref={modalTableContainerRef}
+                  className="overflow-x-auto overflow-y-auto max-h-[58vh] relative border border-gray-100 dark:border-gray-700 rounded-xl scrollbar-thin"
+                >
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="sticky top-0 z-20 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xs shadow-xs">
+                      <tr className="border-b border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 font-semibold text-xs">
+                        <th className="py-2.5 px-3 bg-white/95 dark:bg-gray-800/95 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => toggleCategoryDateSortOrder(activeDetailExpense.id)}
+                            className="flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer select-none"
+                            title={`Date Order: ${getCategorySortOrder(activeDetailExpense.id) === 'desc' ? 'Descending (Click to sort Ascending)' : 'Ascending (Click to sort Descending)'}`}
+                          >
+                            <span>Date</span>
+                            {getCategorySortOrder(activeDetailExpense.id) === 'desc' ? (
+                              <ArrowDown className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                             ) : (
-                              <div className="flex items-center gap-1 group/col">
-                                <span>{col}</span>
-                                <div className="flex items-center gap-0.5 opacity-0 group-hover/col:opacity-100 transition-opacity">
+                              <ArrowUp className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="py-2.5 px-3 bg-white/95 dark:bg-gray-800/95 whitespace-nowrap min-w-[140px]">Detail</th>
+
+                        {/* Dynamic Custom Column Headers */}
+                        {(activeDetailExpense.customColumns || []).map((col) => {
+                          const isEditingCol = editingColumn?.original === col;
+                          const isDeletingCol = confirmColumnDeleteInModal === col;
+
+                          return (
+                            <th key={col} className="py-2.5 px-3 bg-white/95 dark:bg-gray-800/95 whitespace-nowrap min-w-[110px]">
+                              {isDeletingCol ? (
+                                <div className="flex items-center gap-1 bg-red-50 dark:bg-red-950/60 p-1 rounded">
+                                  <span className="text-red-700 dark:text-red-300 font-bold text-[11px]">Delete {col}?</span>
                                   <button
-                                    onClick={() => setEditingColumn({ original: col, text: col })}
-                                    className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded"
-                                    title="Rename column"
+                                    onClick={() =>
+                                      executeRemoveCustomColumn(activeDetailExpense.id, col)
+                                    }
+                                    className="px-1.5 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold cursor-pointer"
                                   >
-                                    <Edit2 className="w-3 h-3" />
+                                    Yes
                                   </button>
                                   <button
-                                    onClick={() => setConfirmColumnDeleteInModal(col)}
-                                    className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 rounded"
-                                    title="Remove column"
+                                    onClick={() => setConfirmColumnDeleteInModal(null)}
+                                    className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded text-[10px] cursor-pointer"
                                   >
-                                    <Trash2 className="w-3 h-3" />
+                                    No
                                   </button>
                                 </div>
-                              </div>
-                            )}
-                          </th>
-                        );
-                      })}
-
-                      <th className="py-2.5 px-3 text-right">Amount (₹)</th>
-                      <th className="py-2.5 px-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50 dark:divide-gray-700/60 text-gray-700 dark:text-gray-200 font-medium">
-                    {(() => {
-                      const modalSortOrder = getCategorySortOrder(activeDetailExpense.id);
-                      const modalItems = sortExpenseItems(
-                        showAllModalHistory
-                          ? activeDetailExpense.items || []
-                          : getExpenseFilteredItems(activeDetailExpense),
-                        modalSortOrder
-                      );
-
-                      if (modalItems.length === 0) {
-                        return (
-                          <tr>
-                            <td
-                              colSpan={4 + (activeDetailExpense.customColumns || []).length}
-                              className="py-8 text-center text-gray-400 dark:text-gray-500 italic"
-                            >
-                              No entries found {showAllModalHistory ? 'in history' : 'for this period'}. Click "+ Add Entry" above to create an entry!
-                            </td>
-                          </tr>
-                        );
-                      }
-
-                      return modalItems.map((item) => {
-                        const isItemEditing =
-                          editingItem?.expenseId === activeDetailExpense.id &&
-                          editingItem?.itemId === item.id;
-                        const isItemDeleting = confirmItemDeleteInModal === item.id;
-
-                        if (isItemDeleting) {
-                          return (
-                            <tr key={item.id} className="bg-red-50/80 dark:bg-red-950/60">
-                              <td
-                                colSpan={4 + (activeDetailExpense.customColumns || []).length}
-                                className="py-2.5 px-4"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="text-red-800 dark:text-red-200 font-bold text-xs">
-                                    Delete entry "{item.item || 'this entry'}"?
-                                  </span>
-                                  <div className="flex items-center gap-2">
+                              ) : isEditingCol ? (
+                                <div className="flex items-center gap-1">
+                                  <input
+                                    type="text"
+                                    value={editingColumn.text}
+                                    onChange={(e) =>
+                                      setEditingColumn({
+                                        ...editingColumn,
+                                        text: e.target.value,
+                                      })
+                                    }
+                                    onKeyDown={(e) =>
+                                      e.key === 'Enter' &&
+                                      handleSaveEditColumn(activeDetailExpense.id)
+                                    }
+                                    autoFocus
+                                    className="w-24 px-1.5 py-0.5 border border-indigo-300 dark:border-indigo-600 rounded text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none normal-case"
+                                  />
+                                  <button
+                                    onClick={() => handleSaveEditColumn(activeDetailExpense.id)}
+                                    className="p-0.5 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/40 rounded cursor-pointer"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingColumn(null)}
+                                    className="p-0.5 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 group/col">
+                                  <span>{col}</span>
+                                  <div className="flex items-center gap-0.5 opacity-0 group-hover/col:opacity-100 transition-opacity">
                                     <button
-                                      onClick={() =>
-                                        executeDeleteLineItem(activeDetailExpense.id, item.id)
-                                      }
-                                      className="px-3 py-1 bg-red-600 text-white rounded-lg font-bold text-xs hover:bg-red-700"
+                                      onClick={() => setEditingColumn({ original: col, text: col })}
+                                      className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 rounded cursor-pointer"
+                                      title="Rename column"
                                     >
-                                      Delete
+                                      <Edit2 className="w-3 h-3" />
                                     </button>
                                     <button
-                                      onClick={() => setConfirmItemDeleteInModal(null)}
-                                      className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
+                                      onClick={() => setConfirmColumnDeleteInModal(col)}
+                                      className="p-0.5 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 rounded cursor-pointer"
+                                      title="Remove column"
                                     >
-                                      Cancel
+                                      <Trash2 className="w-3 h-3" />
                                     </button>
                                   </div>
                                 </div>
+                              )}
+                            </th>
+                          );
+                        })}
+
+                        <th className="py-2.5 px-3 text-right bg-white/95 dark:bg-gray-800/95 whitespace-nowrap min-w-[100px]">Amount (₹)</th>
+                        <th className="py-2.5 px-3 text-right bg-white dark:bg-gray-800 sticky top-0 right-0 z-30 border-l border-gray-200 dark:border-gray-700 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.08)] whitespace-nowrap w-24">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 dark:divide-gray-700/60 text-gray-700 dark:text-gray-200 font-medium">
+                      {(() => {
+                        const modalSortOrder = getCategorySortOrder(activeDetailExpense.id);
+                        const modalItems = sortExpenseItems(
+                          showAllModalHistory
+                            ? activeDetailExpense.items || []
+                            : getExpenseFilteredItems(activeDetailExpense),
+                          modalSortOrder
+                        );
+
+                        if (modalItems.length === 0) {
+                          return (
+                            <tr>
+                              <td
+                                colSpan={4 + (activeDetailExpense.customColumns || []).length}
+                                className="py-8 text-center text-gray-400 dark:text-gray-500 italic"
+                              >
+                                No entries found {showAllModalHistory ? 'in history' : 'for this period'}. Click "+ Add Entry" above to create an entry!
                               </td>
                             </tr>
                           );
                         }
 
-                        if (isItemEditing) {
-                          return (
-                            <tr key={item.id} className="bg-indigo-50/50 dark:bg-indigo-950/50">
-                              <td className="py-2 px-3">
-                                <input
-                                  type="date"
-                                  value={editingItem.date}
-                                  onChange={(e) =>
-                                    setEditingItem({
-                                      ...editingItem,
-                                      date: e.target.value,
-                                    })
-                                  }
-                                  className="px-2 py-1 border border-indigo-300 dark:border-indigo-600 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none"
-                                />
-                              </td>
-                              <td className="py-2 px-3">
-                                <input
-                                  type="text"
-                                  value={editingItem.item}
-                                  onChange={(e) =>
-                                    setEditingItem({
-                                      ...editingItem,
-                                      item: e.target.value,
-                                    })
-                                  }
-                                  className="w-full px-2 py-1 border border-indigo-300 dark:border-indigo-600 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none"
-                                />
-                              </td>
+                        return modalItems.map((item) => {
+                          const isItemEditing =
+                            editingItem?.expenseId === activeDetailExpense.id &&
+                            editingItem?.itemId === item.id;
+                          const isItemDeleting = confirmItemDeleteInModal === item.id;
 
-                              {/* Custom Column Editing Inputs */}
-                              {(activeDetailExpense.customColumns || []).map((col) => (
-                                <td key={col} className="py-2 px-3">
+                          if (isItemDeleting) {
+                            return (
+                              <tr key={item.id} className="bg-red-50/80 dark:bg-red-950/60">
+                                <td
+                                  colSpan={4 + (activeDetailExpense.customColumns || []).length}
+                                  className="py-2.5 px-4"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-red-800 dark:text-red-200 font-bold text-xs">
+                                      Delete entry "{item.item || 'this entry'}"?
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() =>
+                                          executeDeleteLineItem(activeDetailExpense.id, item.id)
+                                        }
+                                        className="px-3 py-1 bg-red-600 text-white rounded-lg font-bold text-xs hover:bg-red-700 cursor-pointer"
+                                      >
+                                        Delete
+                                      </button>
+                                      <button
+                                        onClick={() => setConfirmItemDeleteInModal(null)}
+                                        className="px-3 py-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          if (isItemEditing) {
+                            return (
+                              <tr key={item.id} className="bg-indigo-50/50 dark:bg-indigo-950/50">
+                                <td className="py-2 px-3 whitespace-nowrap">
                                   <input
-                                    type="text"
-                                    placeholder={col}
-                                    value={editingItem.customValues[col] || ''}
+                                    type="date"
+                                    value={editingItem.date}
                                     onChange={(e) =>
                                       setEditingItem({
                                         ...editingItem,
-                                        customValues: {
-                                          ...editingItem.customValues,
-                                          [col]: e.target.value,
-                                        },
+                                        date: e.target.value,
+                                      })
+                                    }
+                                    className="px-2 py-1 border border-indigo-300 dark:border-indigo-600 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none"
+                                  />
+                                </td>
+                                <td className="py-2 px-3 min-w-[140px]">
+                                  <input
+                                    type="text"
+                                    value={editingItem.item}
+                                    onChange={(e) =>
+                                      setEditingItem({
+                                        ...editingItem,
+                                        item: e.target.value,
                                       })
                                     }
                                     className="w-full px-2 py-1 border border-indigo-300 dark:border-indigo-600 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none"
                                   />
                                 </td>
-                              ))}
 
-                              <td className="py-2 px-3 text-right">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  value={editingItem.amount}
-                                  onChange={(e) =>
-                                    setEditingItem({
-                                      ...editingItem,
-                                      amount: e.target.value,
-                                    })
-                                  }
-                                  className="w-24 px-2 py-1 border border-indigo-300 dark:border-indigo-600 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-right focus:outline-none"
-                                />
+                                {/* Custom Column Editing Inputs with Spender Selector */}
+                                {(activeDetailExpense.customColumns || []).map((col) => {
+                                  const isSpenderCol =
+                                    col.toLowerCase().includes('spender') ||
+                                    col.toLowerCase().includes('paid') ||
+                                    col.toLowerCase().includes('payer');
+                                  return (
+                                    <td key={col} className="py-2 px-3 whitespace-nowrap min-w-[110px]">
+                                      <div className="relative flex items-center">
+                                        <input
+                                          type="text"
+                                          placeholder={col}
+                                          value={editingItem.customValues[col] || ''}
+                                          onChange={(e) =>
+                                            setEditingItem({
+                                              ...editingItem,
+                                              customValues: {
+                                                ...editingItem.customValues,
+                                                [col]: e.target.value,
+                                              },
+                                            })
+                                          }
+                                          className={`w-full px-2 py-1 border border-indigo-300 dark:border-indigo-600 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none ${
+                                            isSpenderCol ? 'pr-7' : ''
+                                          }`}
+                                        />
+                                        {isSpenderCol && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              const rect = e.currentTarget.getBoundingClientRect();
+                                              setDailySpenderPicker({
+                                                target: 'inline_edit',
+                                                column: col,
+                                                anchorRect: rect,
+                                              });
+                                              setDailySpenderSearch('');
+                                            }}
+                                            className="absolute right-1.5 p-0.5 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                                            title="Select spender from columns / members"
+                                          >
+                                            <ChevronDown className="w-3 h-3" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  );
+                                })}
+
+                                <td className="py-2 px-3 text-right whitespace-nowrap min-w-[110px]">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      value={editingItem.amount}
+                                      onChange={(e) =>
+                                        setEditingItem({
+                                          ...editingItem,
+                                          amount: e.target.value,
+                                        })
+                                      }
+                                      className="w-20 px-2 py-1 border border-indigo-300 dark:border-indigo-600 rounded-lg text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-right focus:outline-none"
+                                    />
+                                    {(activeDetailExpense.customColumns || []).length > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          const amt = Number(editingItem.amount) || 0;
+                                          setDailySplitPopover({
+                                            target: 'inline_edit',
+                                            totalAmount: amt,
+                                            anchorRect: rect,
+                                          });
+                                          setDailySplitMode('equal');
+                                          setDailySplitSearch('');
+                                          setDailySplitSelectedCols([]);
+                                        }}
+                                        className="p-1 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded-lg border border-indigo-200 dark:border-indigo-800 cursor-pointer"
+                                        title="Split amount across custom columns"
+                                      >
+                                        <Divide className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-2 px-3 text-right sticky right-0 z-10 bg-indigo-50/95 dark:bg-indigo-950/95 border-l border-indigo-200 dark:border-indigo-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.08)] whitespace-nowrap w-24">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      onClick={handleSaveEditItem}
+                                      className="p-1 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/40 rounded-lg cursor-pointer"
+                                      title="Save detail"
+                                    >
+                                      <Check className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => setEditingItem(null)}
+                                      className="p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg cursor-pointer"
+                                      title="Cancel"
+                                    >
+                                      <X className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }
+
+                          return (
+                            <tr key={item.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-700/50 transition-colors group/row">
+                              <td className="py-3 px-3 text-gray-600 dark:text-gray-400 font-normal whitespace-nowrap">
+                                {item.date ? format(parseISO(item.date), 'dd MMM yyyy') : '-'}
                               </td>
-                              <td className="py-2 px-3 text-right">
-                                <div className="flex items-center justify-end gap-1">
+                              <td className="py-3 px-3 font-semibold text-gray-800 dark:text-gray-200 min-w-[140px]">
+                                {item.item}
+                              </td>
+
+                              {/* Dynamic Custom Column Values */}
+                              {(activeDetailExpense.customColumns || []).map((col) => {
+                                const isSpenderCol =
+                                  col.toLowerCase().includes('spender') ||
+                                  col.toLowerCase().includes('paid') ||
+                                  col.toLowerCase().includes('payer');
+                                const val = item.customValues?.[col] || '';
+                                return (
+                                  <td key={col} className="py-3 px-3 text-gray-700 dark:text-gray-300 whitespace-nowrap min-w-[110px]">
+                                    {isSpenderCol && val ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
+                                        {val}
+                                      </span>
+                                    ) : (
+                                      val || '-'
+                                    )}
+                                  </td>
+                                );
+                              })}
+
+                              <td className="py-3 px-3 text-right font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap min-w-[100px]">
+                                ₹{item.amount.toFixed(2)}
+                              </td>
+                              <td className="py-3 px-3 text-right sticky right-0 z-10 bg-white dark:bg-gray-800 group-hover/row:bg-gray-50 dark:group-hover/row:bg-gray-750 border-l border-gray-100 dark:border-gray-700 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.08)] whitespace-nowrap w-24">
+                                <div className="flex items-center justify-end gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
                                   <button
-                                    onClick={handleSaveEditItem}
-                                    className="p-1 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950/40 rounded-lg"
-                                    title="Save detail"
+                                    onClick={() =>
+                                      setEditingItem({
+                                        expenseId: activeDetailExpense.id,
+                                        itemId: item.id,
+                                        date: item.date,
+                                        item: item.item,
+                                        amount: item.amount.toString(),
+                                        customValues: item.customValues || {},
+                                      })
+                                    }
+                                    className="p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-gray-700 rounded-md cursor-pointer"
+                                    title="Edit entry"
                                   >
-                                    <Check className="w-4 h-4" />
+                                    <Edit2 className="w-3.5 h-3.5" />
                                   </button>
                                   <button
-                                    onClick={() => setEditingItem(null)}
-                                    className="p-1 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg"
-                                    title="Cancel"
+                                    onClick={() => setConfirmItemDeleteInModal(item.id)}
+                                    className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md cursor-pointer"
+                                    title="Delete entry"
                                   >
-                                    <X className="w-4 h-4" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
                               </td>
                             </tr>
                           );
-                        }
-
-                        return (
-                          <tr key={item.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-700/50 transition-colors">
-                            <td className="py-3 px-3 text-gray-600 dark:text-gray-400 font-normal">
-                              {item.date ? format(parseISO(item.date), 'dd MMM yyyy') : '-'}
-                            </td>
-                            <td className="py-3 px-3 font-semibold text-gray-800 dark:text-gray-200">
-                              {item.item}
-                            </td>
-
-                            {/* Dynamic Custom Column Values */}
-                            {(activeDetailExpense.customColumns || []).map((col) => (
-                              <td key={col} className="py-3 px-3 text-gray-700 dark:text-gray-300">
-                                {item.customValues?.[col] || '-'}
-                              </td>
-                            ))}
-
-                            <td className="py-3 px-3 text-right font-bold text-gray-900 dark:text-gray-100">
-                              ₹{item.amount.toFixed(2)}
-                            </td>
-                            <td className="py-3 px-3 text-right">
-                              <div className="flex items-center justify-end gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={() =>
-                                    setEditingItem({
-                                      expenseId: activeDetailExpense.id,
-                                      itemId: item.id,
-                                      date: item.date,
-                                      item: item.item,
-                                      amount: item.amount.toString(),
-                                      customValues: item.customValues || {},
-                                    })
-                                  }
-                                  className="p-1 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-gray-700 rounded-md"
-                                  title="Edit entry"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => setConfirmItemDeleteInModal(item.id)}
-                                  className="p-1 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md"
-                                  title="Delete entry"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      });
-                    })()}
-                  </tbody>
-                </table>
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
@@ -2450,6 +2857,379 @@ export default function Expenditure({
           </div>
         </div>
       )}
+
+      {/* Daily Expense Spender Picker Dropdown Popover */}
+      {(() => {
+        if (!dailySpenderPicker || !activeDetailExpense) return null;
+
+        const candidates = getDailySpenderCandidates(activeDetailExpense);
+        const searchLower = dailySpenderSearch.trim().toLowerCase();
+        const filtered = searchLower
+          ? candidates.filter((c) => c.toLowerCase().includes(searchLower))
+          : candidates;
+        const isExactMatch = candidates.some((c) => c.toLowerCase() === searchLower);
+
+        return createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[9998]"
+              onClick={() => {
+                setDailySpenderPicker(null);
+                setDailySpenderSearch('');
+              }}
+            />
+            <div
+              ref={dailySpenderPickerRef}
+              style={getFloatingPopoverStyle(dailySpenderPicker.anchorRect, 230)}
+              onClick={(e) => e.stopPropagation()}
+              className="fixed z-[9999] bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-2.5 text-left w-[230px] animate-in fade-in duration-100"
+            >
+              <div className="flex items-center gap-1.5 px-2 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg mb-2">
+                <Search className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search or add spender..."
+                  value={dailySpenderSearch}
+                  onChange={(e) => setDailySpenderSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && dailySpenderSearch.trim()) {
+                      handleSelectDailySpender(
+                        activeDetailExpense.id,
+                        dailySpenderPicker.target,
+                        dailySpenderPicker.column,
+                        dailySpenderSearch.trim()
+                      );
+                    }
+                  }}
+                  autoFocus
+                  className="w-full text-xs bg-transparent text-gray-800 dark:text-gray-200 focus:outline-none"
+                />
+                {dailySpenderSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setDailySpenderSearch('')}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Add new spender button if typed string is new */}
+              {dailySpenderSearch.trim() && !isExactMatch && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleSelectDailySpender(
+                      activeDetailExpense.id,
+                      dailySpenderPicker.target,
+                      dailySpenderPicker.column,
+                      dailySpenderSearch.trim()
+                    )
+                  }
+                  className="w-full text-left px-2.5 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 rounded-lg flex items-center gap-1.5 mb-1 transition-colors cursor-pointer border border-dashed border-indigo-200 dark:border-indigo-800"
+                >
+                  <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="truncate">Add "{dailySpenderSearch.trim()}"</span>
+                </button>
+              )}
+
+              <div className="max-h-48 overflow-y-auto space-y-0.5 pr-0.5">
+                {filtered.length === 0 && !dailySpenderSearch.trim() && (
+                  <p className="text-[11px] text-gray-400 text-center py-2 italic">
+                    No columns or spenders found
+                  </p>
+                )}
+                {filtered.map((candidate) => (
+                  <button
+                    key={candidate}
+                    type="button"
+                    onClick={() =>
+                      handleSelectDailySpender(
+                        activeDetailExpense.id,
+                        dailySpenderPicker.target,
+                        dailySpenderPicker.column,
+                        candidate
+                      )
+                    }
+                    className="w-full text-left px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-700 dark:hover:text-indigo-300 rounded-lg transition-colors cursor-pointer font-medium truncate flex items-center justify-between"
+                  >
+                    <span>{candidate}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="pt-2 mt-1 border-t border-gray-100 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleSelectDailySpender(
+                      activeDetailExpense.id,
+                      dailySpenderPicker.target,
+                      dailySpenderPicker.column,
+                      ''
+                    )
+                  }
+                  className="w-full text-center text-xs text-gray-400 hover:text-red-500 py-1 cursor-pointer transition-colors"
+                >
+                  Clear Spender
+                </button>
+              </div>
+            </div>
+          </>,
+          document.body
+        );
+      })()}
+
+      {/* Daily Expense Split Popover */}
+      {(() => {
+        if (!dailySplitPopover || !activeDetailExpense) return null;
+
+        const customCols = activeDetailExpense.customColumns || [];
+        const searchLower = dailySplitSearch.trim().toLowerCase();
+        const filteredCols = searchLower
+          ? customCols.filter((c) => c.toLowerCase().includes(searchLower))
+          : customCols;
+
+        return createPortal(
+          <>
+            <div
+              className="fixed inset-0 z-[9998] bg-black/30 sm:bg-transparent backdrop-blur-2xs"
+              onClick={() => setDailySplitPopover(null)}
+            />
+            <div
+              ref={dailySplitPopoverRef}
+              style={getFloatingPopoverStyle(dailySplitPopover.anchorRect, 280)}
+              onClick={(e) => e.stopPropagation()}
+              className="fixed z-[9999] inset-x-3 top-1/2 -translate-y-1/2 sm:translate-y-0 sm:inset-auto max-w-xs sm:max-w-none sm:w-[280px] mx-auto sm:mx-0 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-3.5 text-left animate-in fade-in duration-100"
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-1.5 mb-2.5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-800 dark:text-gray-200">
+                  <Calculator className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Split Options</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDailySplitPopover(null)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-0.5 rounded cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {customCols.length === 0 ? (
+                <div className="text-center py-3 space-y-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    No custom columns found.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700/60 p-0.5 mb-2.5 text-[11px] font-medium">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDailySplitMode('exclude');
+                        setDailySplitSelectedCols([]);
+                      }}
+                      className={`flex-1 py-1 px-1 rounded-md transition-all text-center cursor-pointer ${
+                        dailySplitMode === 'exclude'
+                          ? 'bg-white dark:bg-gray-800 text-red-600 dark:text-red-400 shadow-xs font-semibold'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                      }`}
+                    >
+                      1. Exclude
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDailySplitMode('include');
+                        setDailySplitSelectedCols([]);
+                      }}
+                      className={`flex-1 py-1 px-1 rounded-md transition-all text-center cursor-pointer ${
+                        dailySplitMode === 'include'
+                          ? 'bg-white dark:bg-gray-800 text-emerald-600 dark:text-emerald-400 shadow-xs font-semibold'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                      }`}
+                    >
+                      2. Include
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDailySplitMode('equal');
+                        setDailySplitSelectedCols([]);
+                      }}
+                      className={`flex-1 py-1 px-1 rounded-md transition-all text-center cursor-pointer ${
+                        dailySplitMode === 'equal'
+                          ? 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 shadow-xs font-semibold'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
+                      }`}
+                    >
+                      3. Split All
+                    </button>
+                  </div>
+
+                  {dailySplitMode === 'equal' ? (
+                    <div className="space-y-2 py-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Split ₹{dailySplitPopover.totalAmount.toFixed(2)} equally among all {customCols.length} columns (₹
+                        {customCols.length > 0
+                          ? (dailySplitPopover.totalAmount / customCols.length).toFixed(2)
+                          : '0.00'}{' '}
+                        each).
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          applyDailySplit(
+                            activeDetailExpense.id,
+                            dailySplitPopover.target,
+                            'equal',
+                            [],
+                            dailySplitPopover.totalAmount
+                          )
+                        }
+                        className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer"
+                      >
+                        Apply Equal Split
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                          {dailySplitMode === 'exclude'
+                            ? 'Check columns to EXCLUDE:'
+                            : 'Check columns to INCLUDE:'}
+                        </span>
+                        <div className="flex items-center gap-1.5 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => setDailySplitSelectedCols([...customCols])}
+                            className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold cursor-pointer"
+                          >
+                            All
+                          </button>
+                          <span className="text-gray-300 dark:text-gray-600">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setDailySplitSelectedCols([])}
+                            className="text-gray-500 hover:underline cursor-pointer"
+                          >
+                            None
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Search box for columns */}
+                      <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <Search className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                        <input
+                          type="text"
+                          placeholder="Search column or spender..."
+                          value={dailySplitSearch}
+                          onChange={(e) => setDailySplitSearch(e.target.value)}
+                          className="w-full text-xs bg-transparent text-gray-800 dark:text-gray-200 focus:outline-none"
+                        />
+                        {dailySplitSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setDailySplitSearch('')}
+                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                        {filteredCols.length === 0 ? (
+                          <p className="text-xxs text-gray-400 text-center py-2 italic">
+                            No matching columns
+                          </p>
+                        ) : (
+                          filteredCols.map((c) => {
+                            const isChecked = dailySplitSelectedCols.includes(c);
+                            return (
+                              <label
+                                key={c}
+                                className={`flex items-center justify-between p-1.5 rounded-lg border text-xs cursor-pointer transition-colors ${
+                                  isChecked
+                                    ? dailySplitMode === 'exclude'
+                                      ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 font-medium'
+                                      : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 font-medium'
+                                    : 'bg-gray-50 dark:bg-gray-700/40 border-transparent text-gray-700 dark:text-gray-300 hover:bg-gray-100'
+                                }`}
+                              >
+                                <span className="truncate mr-2">{c}</span>
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setDailySplitSelectedCols((prev) => [...prev, c]);
+                                    } else {
+                                      setDailySplitSelectedCols((prev) =>
+                                        prev.filter((id) => id !== c)
+                                      );
+                                    }
+                                  }}
+                                  className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                />
+                              </label>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Active Count and Per-Person Preview */}
+                      {(() => {
+                        const activeCount =
+                          dailySplitMode === 'exclude'
+                            ? customCols.length - dailySplitSelectedCols.length
+                            : dailySplitSelectedCols.length;
+                        const perPerson =
+                          activeCount > 0
+                            ? (dailySplitPopover.totalAmount / activeCount).toFixed(2)
+                            : '0.00';
+
+                        return (
+                          <div className="pt-2 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-xs">
+                            <span className="text-gray-500 dark:text-gray-400">
+                              {activeCount} active columns:
+                            </span>
+                            <span className="font-bold text-gray-800 dark:text-gray-100">
+                              ₹{perPerson} each
+                            </span>
+                          </div>
+                        );
+                      })()}
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          applyDailySplit(
+                            activeDetailExpense.id,
+                            dailySplitPopover.target,
+                            dailySplitMode,
+                            dailySplitSelectedCols,
+                            dailySplitPopover.totalAmount
+                          )
+                        }
+                        className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer"
+                      >
+                        Apply Split
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </>,
+          document.body
+        );
+      })()}
 
       {/* Full PDF Report Document Preview & Print Modal */}
       {showPdfPreviewModal && (
