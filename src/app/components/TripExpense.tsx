@@ -270,6 +270,9 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
   const [spenderFilters, setSpenderFilters] = useState<Record<string, string>>({}); // tripId -> selectedSpender
   const [showFilterMenuId, setShowFilterMenuId] = useState<string | null>(null); // spender dropdown tripId
 
+  // Settlement breakdown checkbox toggle state (next to overall total)
+  const [showSettlement, setShowSettlement] = useState<Record<string, boolean>>({}); // tripId -> boolean
+
   const [confirmDelete, setConfirmDelete] = useState<{
     type: 'trip' | 'column' | 'entry';
     tripId: string;
@@ -887,6 +890,50 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     return totals;
   }, [editingEntries, editBuffers]);
 
+  // Calculations for person spend amounts and settlement (pay/give)
+  const calculateSettlement = useCallback((trip: Trip, entriesToSum: TripEntry[]) => {
+    const spends: Record<string, number> = {};
+    let totalSpent = 0;
+
+    trip.columns.forEach((col) => {
+      if (col.type === 'number' || col.type === 'split') {
+        spends[col.id] = 0;
+      }
+    });
+
+    const spenderCol = trip.columns.find((c) => c.id === 'spender');
+    const amountCol = trip.columns.find((c) => c.id === 'total_amount');
+
+    entriesToSum.forEach((entry) => {
+      const isEditing = editingEntries[trip.id]?.has(entry.id);
+      const data = isEditing && editBuffers[trip.id]?.[entry.id]
+        ? editBuffers[trip.id][entry.id]
+        : entry.data;
+
+      const spender = (spenderCol ? data[spenderCol.id] : data['spender'])?.trim().toLowerCase();
+      const amount = parseFloat(data[amountCol?.id || 'total_amount'] || '0') || 0;
+
+      if (amount > 0) {
+        totalSpent += amount;
+      }
+
+      if (spender && amount > 0) {
+        // Find matching column for this spender
+        const matchingCol = trip.columns.find(
+          (c) =>
+            (c.type === 'split' || c.type === 'number') &&
+            (c.name?.trim().toLowerCase() === spender || c.id.toLowerCase() === spender)
+        );
+
+        if (matchingCol) {
+          spends[matchingCol.id] = (spends[matchingCol.id] || 0) + amount;
+        }
+      }
+    });
+
+    return { spends, totalSpent };
+  }, [editingEntries, editBuffers]);
+
   // Recalculate manually + trigger spin animation
   const handleManualRefresh = (tripId: string) => {
     setSpinningTrip((prev) => ({ ...prev, [tripId]: true }));
@@ -1066,6 +1113,8 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
           visibleTrips.map((trip) => {
               const filteredEntries = getFilteredEntries(trip);
               const tripTotals = calculateTotals(trip, filteredEntries);
+              const { spends: personSpends, totalSpent: totalSpentAll } = calculateSettlement(trip, filteredEntries);
+              const isSettlementActive = !!showSettlement[trip.id];
 
               return (
                 <div
@@ -1200,25 +1249,25 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
 
                         {/* Horizontal Scroll Navigation Controls */}
                         {trip.columns.length > 4 && (
-                          <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-700/60 p-0.5 rounded-lg border border-gray-200/70 dark:border-gray-600">
+                          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/60 p-1 rounded-lg border border-gray-200 dark:border-gray-600 shadow-2xs">
                             <button
                               type="button"
                               onClick={() => scrollTable(trip.id, 'left')}
-                              className="p-1 text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors cursor-pointer"
-                              title="Scroll Table Left"
+                              className="p-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors cursor-pointer shadow-xs flex items-center justify-center"
+                              title="Scroll Left (←)"
                             >
-                              <ChevronLeft className="w-3.5 h-3.5" />
+                              <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
                             </button>
-                            <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 px-1 select-none">
+                            <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300 px-1 select-none">
                               {trip.columns.length} cols
                             </span>
                             <button
                               type="button"
                               onClick={() => scrollTable(trip.id, 'right')}
-                              className="p-1 text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors cursor-pointer"
-                              title="Scroll Table Right"
+                              className="p-1 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors cursor-pointer shadow-xs flex items-center justify-center"
+                              title="Scroll Right (→)"
                             >
-                              <ChevronRight className="w-3.5 h-3.5" />
+                              <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
                             </button>
                           </div>
                         )}
@@ -1303,18 +1352,18 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                               <button
                                 type="button"
                                 onClick={() => scrollTable(trip.id, 'left')}
-                                className="absolute left-1 top-1/2 -translate-y-1/2 z-30 w-7 h-7 rounded-full bg-white/95 dark:bg-gray-800/95 shadow-md border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all opacity-70 hover:opacity-100 hover:scale-110 cursor-pointer"
-                                title="Scroll Left"
+                                className="absolute left-1 top-1/2 -translate-y-1/2 z-30 w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/35 border-2 border-white dark:border-gray-800 ring-2 ring-blue-400/40 flex items-center justify-center transition-all hover:scale-115 active:scale-95 cursor-pointer"
+                                title="Scroll Left (←)"
                               >
-                                <ChevronLeft className="w-4 h-4" />
+                                <ChevronLeft className="w-4.5 h-4.5 stroke-[2.5]" />
                               </button>
                               <button
                                 type="button"
                                 onClick={() => scrollTable(trip.id, 'right')}
-                                className="absolute right-28 top-1/2 -translate-y-1/2 z-30 w-7 h-7 rounded-full bg-white/95 dark:bg-gray-800/95 shadow-md border border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-gray-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all opacity-70 hover:opacity-100 hover:scale-110 cursor-pointer"
-                                title="Scroll Right"
+                                className="absolute right-28 top-1/2 -translate-y-1/2 z-30 w-8 h-8 rounded-full bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-500/35 border-2 border-white dark:border-gray-800 ring-2 ring-purple-400/40 flex items-center justify-center transition-all hover:scale-115 active:scale-95 cursor-pointer"
+                                title="Scroll Right (→)"
                               >
-                                <ChevronRight className="w-4 h-4" />
+                                <ChevronRight className="w-4.5 h-4.5 stroke-[2.5]" />
                               </button>
                             </>
                           )}
@@ -1786,24 +1835,44 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                 );
                               })}
 
-                              {/* Total calculation row (Default last row) */}
+                              {/* Total / Settlement calculation rows */}
+                              {/* 1st row: Overall Amount */}
                               <tr className="bg-indigo-50/50 dark:bg-indigo-950/60 font-bold border-t-2 border-indigo-100 dark:border-indigo-900 text-indigo-900 dark:text-indigo-200">
                                 {trip.columns.map((col, index) => {
                                   if (index === 0) {
                                     return (
-                                      <td key="total-label" className="px-4 py-3 flex items-center gap-1.5">
-                                        <button
-                                          onClick={() => handleManualRefresh(trip.id)}
-                                          className="p-1 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 rounded transition-colors cursor-pointer flex items-center justify-center"
-                                          title="Recalculate Totals"
-                                        >
-                                          <RotateCw
-                                            className={`w-3.5 h-3.5 ${
-                                              spinningTrip[trip.id] ? 'animate-spin' : ''
-                                            }`}
-                                          />
-                                        </button>
-                                        <span className="text-xs uppercase tracking-wider">Total</span>
+                                      <td key="total-label" className="px-4 py-3">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <div className="flex items-center gap-1.5">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleManualRefresh(trip.id)}
+                                              className="p-1 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 rounded transition-colors cursor-pointer flex items-center justify-center"
+                                              title="Recalculate Totals"
+                                            >
+                                              <RotateCw
+                                                className={`w-3.5 h-3.5 ${
+                                                  spinningTrip[trip.id] ? 'animate-spin' : ''
+                                                }`}
+                                              />
+                                            </button>
+                                            <span className="text-xs uppercase tracking-wider font-bold">
+                                              {isSettlementActive ? '1. Overall Amount' : 'Total'}
+                                            </span>
+                                          </div>
+                                          {/* Checklist Toggle next to overall total */}
+                                          <label className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-700 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 cursor-pointer shadow-2xs hover:bg-indigo-50 dark:hover:bg-gray-700 select-none transition-colors">
+                                            <input
+                                              type="checkbox"
+                                              checked={isSettlementActive}
+                                              onChange={(e) =>
+                                                setShowSettlement((prev) => ({ ...prev, [trip.id]: e.target.checked }))
+                                              }
+                                              className="w-3.5 h-3.5 text-indigo-600 rounded border-gray-300 dark:border-gray-600 focus:ring-indigo-400 cursor-pointer"
+                                            />
+                                            <span>Settlement</span>
+                                          </label>
+                                        </div>
                                       </td>
                                     );
                                   }
@@ -1824,6 +1893,100 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                 })}
                                 <td key="total-actions-spacer" className="sticky right-0 z-10 px-4 py-3 bg-indigo-50 dark:bg-indigo-950 border-l border-indigo-200 dark:border-indigo-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.12)]"></td>
                               </tr>
+
+                              {/* 2nd & 3rd rows: Shown when Settlement checklist is checked */}
+                              {isSettlementActive && (
+                                <>
+                                  {/* 2nd row: Spend Amount */}
+                                  <tr className="bg-amber-50/60 dark:bg-amber-950/40 font-bold border-t border-amber-200/70 dark:border-amber-900/70 text-amber-900 dark:text-amber-200 text-xs">
+                                    {trip.columns.map((col, index) => {
+                                      if (index === 0) {
+                                        return (
+                                          <td key="spend-label" className="px-4 py-2.5 font-bold text-amber-900 dark:text-amber-200">
+                                            <span className="text-xs uppercase tracking-wider">2. Spend Amount</span>
+                                          </td>
+                                        );
+                                      }
+                                      if (col.id === 'total_amount') {
+                                        return (
+                                          <td key="spend-total" className="px-4 py-2.5 text-xs text-amber-900 dark:text-amber-200">
+                                            ₹{totalSpentAll.toFixed(2)}
+                                          </td>
+                                        );
+                                      }
+                                      if (col.type === 'split' || col.type === 'number') {
+                                        const spent = personSpends[col.id] || 0;
+                                        return (
+                                          <td key={`spend-${col.id}`} className="px-4 py-2.5 text-xs text-amber-800 dark:text-amber-300">
+                                            ₹{spent.toFixed(2)}
+                                          </td>
+                                        );
+                                      }
+                                      return (
+                                        <td key={`spend-empty-${col.id}`} className="px-4 py-2.5 text-xs text-gray-400 dark:text-gray-500 font-normal italic">
+                                          —
+                                        </td>
+                                      );
+                                    })}
+                                    <td key="spend-actions-spacer" className="sticky right-0 z-10 px-4 py-2.5 bg-amber-50 dark:bg-amber-950 border-l border-amber-200 dark:border-amber-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.12)]"></td>
+                                  </tr>
+
+                                  {/* 3rd row: Pay / Give */}
+                                  <tr className="bg-emerald-50/50 dark:bg-emerald-950/40 font-bold border-t border-emerald-200/70 dark:border-emerald-900/70 text-emerald-900 dark:text-emerald-200 text-xs">
+                                    {trip.columns.map((col, index) => {
+                                      if (index === 0) {
+                                        return (
+                                          <td key="paygive-label" className="px-4 py-2.5 font-bold text-gray-900 dark:text-gray-100">
+                                            <span className="text-xs uppercase tracking-wider">3. Pay / Give</span>
+                                          </td>
+                                        );
+                                      }
+                                      if (col.id === 'total_amount') {
+                                        return (
+                                          <td key="paygive-total" className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                                            Balanced
+                                          </td>
+                                        );
+                                      }
+                                      if (col.type === 'split' || col.type === 'number') {
+                                        const share = tripTotals[col.id] || 0;
+                                        const spent = personSpends[col.id] || 0;
+                                        const diff = spent - share;
+
+                                        if (diff > 0.009) {
+                                          return (
+                                            <td key={`paygive-${col.id}`} className="px-4 py-2.5 text-xs">
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700 shadow-2xs">
+                                                Give ₹{diff.toFixed(2)}
+                                              </span>
+                                            </td>
+                                          );
+                                        } else if (diff < -0.009) {
+                                          return (
+                                            <td key={`paygive-${col.id}`} className="px-4 py-2.5 text-xs">
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-bold border border-rose-300 dark:border-rose-700 shadow-2xs">
+                                                Pay ₹{Math.abs(diff).toFixed(2)}
+                                              </span>
+                                            </td>
+                                          );
+                                        } else {
+                                          return (
+                                            <td key={`paygive-${col.id}`} className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400 font-medium">
+                                              Settled (₹0.00)
+                                            </td>
+                                          );
+                                        }
+                                      }
+                                      return (
+                                        <td key={`paygive-empty-${col.id}`} className="px-4 py-2.5 text-xs text-gray-400 dark:text-gray-500 font-normal italic">
+                                          —
+                                        </td>
+                                      );
+                                    })}
+                                    <td key="paygive-actions-spacer" className="sticky right-0 z-10 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-950 border-l border-emerald-200 dark:border-emerald-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.12)]"></td>
+                                  </tr>
+                                </>
+                              )}
                             </tbody>
                           </table>
                         </div>

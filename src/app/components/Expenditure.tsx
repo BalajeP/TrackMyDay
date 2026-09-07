@@ -2133,25 +2133,25 @@ export default function Expenditure({
               {/* Right Side: Horizontal Scroll Controls | + Add Entry (Purple) | + Add Column (Gray) | Red Trash Icon | Close X */}
               <div className="flex items-center gap-2">
                 {(activeDetailExpense.customColumns || []).length > 2 && (
-                  <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/80 p-0.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                  <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/80 p-1 rounded-lg border border-gray-200 dark:border-gray-600 shadow-2xs">
                     <button
                       type="button"
                       onClick={() => scrollModalTable('left')}
-                      className="p-1 text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors cursor-pointer"
-                      title="Scroll table left"
+                      className="p-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors cursor-pointer shadow-xs flex items-center justify-center"
+                      title="Scroll table left (←)"
                     >
-                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
                     </button>
-                    <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 px-1 select-none">
+                    <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300 px-1 select-none">
                       cols
                     </span>
                     <button
                       type="button"
                       onClick={() => scrollModalTable('right')}
-                      className="p-1 text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white dark:hover:bg-gray-800 rounded transition-colors cursor-pointer"
-                      title="Scroll table right"
+                      className="p-1 bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors cursor-pointer shadow-xs flex items-center justify-center"
+                      title="Scroll table right (→)"
                     >
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
                     </button>
                   </div>
                 )}
@@ -2451,18 +2451,18 @@ export default function Expenditure({
                     <button
                       type="button"
                       onClick={() => scrollModalTable('left')}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 z-25 p-2 bg-white/95 dark:bg-gray-800/95 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-gray-700 dark:text-gray-200 rounded-full shadow-lg border border-gray-200/80 dark:border-gray-700 transition-all opacity-70 hover:opacity-100 hover:scale-110 cursor-pointer backdrop-blur-xs"
-                      title="Scroll columns left"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 z-25 w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/35 border-2 border-white dark:border-gray-800 ring-2 ring-blue-400/40 flex items-center justify-center transition-all hover:scale-115 active:scale-95 cursor-pointer"
+                      title="Scroll columns left (←)"
                     >
-                      <ChevronLeft className="w-4 h-4" />
+                      <ChevronLeft className="w-4.5 h-4.5 stroke-[2.5]" />
                     </button>
                     <button
                       type="button"
                       onClick={() => scrollModalTable('right')}
-                      className="absolute right-24 top-1/2 -translate-y-1/2 z-25 p-2 bg-white/95 dark:bg-gray-800/95 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 text-gray-700 dark:text-gray-200 rounded-full shadow-lg border border-gray-200/80 dark:border-gray-700 transition-all opacity-70 hover:opacity-100 hover:scale-110 cursor-pointer backdrop-blur-xs"
-                      title="Scroll columns right"
+                      className="absolute right-24 top-1/2 -translate-y-1/2 z-25 w-8 h-8 rounded-full bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-500/35 border-2 border-white dark:border-gray-800 ring-2 ring-purple-400/40 flex items-center justify-center transition-all hover:scale-115 active:scale-95 cursor-pointer"
+                      title="Scroll columns right (→)"
                     >
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="w-4.5 h-4.5 stroke-[2.5]" />
                     </button>
                   </>
                 )}
