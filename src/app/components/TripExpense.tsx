@@ -273,6 +273,9 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
   // Settlement breakdown checkbox toggle state (next to overall total)
   const [showSettlement, setShowSettlement] = useState<Record<string, boolean>>({}); // tripId -> boolean
 
+  // Deleted spenders state (tripId -> lowercase spender names deleted)
+  const [deletedSpenders, setDeletedSpenders] = useState<Record<string, string[]>>({});
+
   const [confirmDelete, setConfirmDelete] = useState<{
     type: 'trip' | 'column' | 'entry';
     tripId: string;
@@ -780,13 +783,15 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
   const getSpenderCandidates = useCallback((trip: Trip) => {
     const list: string[] = [];
     const seen = new Set<string>();
+    const deleted = new Set((deletedSpenders[trip.id] || []).map((s) => s.toLowerCase()));
 
     // 1. Column names of split members
     (trip.columns || []).forEach((c) => {
       if (c.type === 'split' && c.name?.trim()) {
         const n = c.name.trim();
-        if (!seen.has(n.toLowerCase())) {
-          seen.add(n.toLowerCase());
+        const lower = n.toLowerCase();
+        if (!seen.has(lower) && !deleted.has(lower)) {
+          seen.add(lower);
           list.push(n);
         }
       }
@@ -794,38 +799,52 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
 
     // 2. Partner names
     [partner1Name, partner2Name].forEach((p) => {
-      if (p && p.trim() && !seen.has(p.trim().toLowerCase())) {
-        seen.add(p.trim().toLowerCase());
-        list.push(p.trim());
+      if (p && p.trim()) {
+        const lower = p.trim().toLowerCase();
+        if (!seen.has(lower) && !deleted.has(lower)) {
+          seen.add(lower);
+          list.push(p.trim());
+        }
       }
     });
 
     // 3. Existing spenders entered in this trip
     (trip.entries || []).forEach((e) => {
       const s = e.data['spender']?.trim();
-      if (s && !seen.has(s.toLowerCase())) {
-        seen.add(s.toLowerCase());
-        list.push(s);
+      if (s) {
+        const lower = s.toLowerCase();
+        if (!seen.has(lower) && !deleted.has(lower)) {
+          seen.add(lower);
+          list.push(s);
+        }
       }
     });
 
     return list;
-  }, [partner1Name, partner2Name]);
+  }, [partner1Name, partner2Name, deletedSpenders]);
 
   // Handle selecting or adding a spender
   const handleSelectSpender = (tripId: string, entryId: string, spenderName: string) => {
+    const trimmed = spenderName.trim();
+    if (trimmed) {
+      setDeletedSpenders((prev) => ({
+        ...prev,
+        [tripId]: (prev[tripId] || []).filter((s) => s.toLowerCase() !== trimmed.toLowerCase()),
+      }));
+    }
+
     const isEditing = editingEntries[tripId]?.has(entryId);
     if (isEditing) {
-      updateBufferValue(tripId, entryId, 'spender', spenderName);
+      updateBufferValue(tripId, entryId, 'spender', trimmed);
     } else {
       setState((prev) => ({
         ...prev,
-        trips: prev.trips.map((t) => {
+        trips: (prev?.trips || activeState.trips).map((t) => {
           if (t.id !== tripId) return t;
           return {
             ...t,
-            entries: t.entries.map((e) =>
-              e.id === entryId ? { ...e, data: { ...e.data, spender: spenderName } } : e
+            entries: (t.entries || []).map((e) =>
+              e.id === entryId ? { ...e, data: { ...e.data, spender: trimmed } } : e
             ),
             updatedAt: new Date().toISOString(),
           };
@@ -834,6 +853,51 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
     }
     setActiveSpenderPicker(null);
     setSpenderSearch('');
+  };
+
+  // Handle deleting a spender from the spender list
+  const handleDeleteSpender = (tripId: string, spenderName: string) => {
+    const norm = spenderName.trim().toLowerCase();
+    setDeletedSpenders((prev) => ({
+      ...prev,
+      [tripId]: [...(prev[tripId] || []), norm],
+    }));
+
+    // Clear this spender from all saved entries in this trip
+    setState((prev) => ({
+      ...prev,
+      trips: (prev?.trips || activeState.trips).map((t) => {
+        if (t.id !== tripId) return t;
+        return {
+          ...t,
+          entries: (t.entries || []).map((e) => {
+            if (e.data['spender']?.trim().toLowerCase() === norm) {
+              return { ...e, data: { ...e.data, spender: '' } };
+            }
+            return e;
+          }),
+          updatedAt: new Date().toISOString(),
+        };
+      }),
+    }));
+
+    // Also clear from active edit buffer if open
+    setEditBuffers((prev) => {
+      const tripBuf = prev[tripId];
+      if (!tripBuf) return prev;
+      let changed = false;
+      const nextTripBuf: Record<string, Record<string, string>> = {};
+      Object.keys(tripBuf).forEach((eId) => {
+        const eData = tripBuf[eId];
+        if (eData?.['spender']?.trim().toLowerCase() === norm) {
+          changed = true;
+          nextTripBuf[eId] = { ...eData, spender: '' };
+        } else {
+          nextTripBuf[eId] = eData;
+        }
+      });
+      return changed ? { ...prev, [tripId]: nextTripBuf } : prev;
+    });
   };
 
   // Filter entries by spender
@@ -1370,7 +1434,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
 
                           <div
                             ref={(el) => { tableContainerRefs.current[trip.id] = el; }}
-                            className="overflow-x-auto overflow-y-auto max-h-[70vh] border border-gray-200 dark:border-gray-700 rounded-xl scrollbar-thin relative"
+                            className="overflow-x-auto overflow-y-auto min-h-[340px] max-h-[70vh] border border-gray-200 dark:border-gray-700 rounded-xl scrollbar-thin relative"
                           >
                             <table className="w-full border-collapse">
                               <thead className="sticky top-0 z-20 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur-xs">
@@ -1545,6 +1609,32 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                              {filteredEntries.length === 0 && (
+                                <tr>
+                                  <td
+                                    colSpan={trip.columns.length + 1}
+                                    className="py-20 text-center text-gray-400 dark:text-gray-500 bg-gray-50/20 dark:bg-gray-900/20"
+                                  >
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                      <Filter className="w-8 h-8 text-indigo-300 dark:text-indigo-700/60 stroke-[1.5]" />
+                                      <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                                        {spenderFilters[trip.id] && spenderFilters[trip.id] !== 'all'
+                                          ? `No expenses found for spender "${spenderFilters[trip.id]}"`
+                                          : 'No expense records found'}
+                                      </p>
+                                      {spenderFilters[trip.id] && spenderFilters[trip.id] !== 'all' && (
+                                        <button
+                                          type="button"
+                                          onClick={() => setSpenderFilters((prev) => ({ ...prev, [trip.id]: 'all' }))}
+                                          className="mt-1 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/80 text-indigo-600 dark:text-indigo-400 text-xs font-semibold rounded-lg border border-indigo-200 dark:border-indigo-800 transition-colors cursor-pointer shadow-2xs"
+                                        >
+                                          Show All Spenders
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
                               {filteredEntries.map((entry) => {
                                 const isEditing = editingEntries[trip.id]?.has(entry.id);
                                 const buffer = editBuffers[trip.id]?.[entry.id];
@@ -1956,7 +2046,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                         if (diff > 0.009) {
                                           return (
                                             <td key={`paygive-${col.id}`} className="px-4 py-2.5 text-xs">
-                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700 shadow-2xs">
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-bold border border-rose-300 dark:border-rose-700 shadow-2xs">
                                                 Give ₹{diff.toFixed(2)}
                                               </span>
                                             </td>
@@ -1964,7 +2054,7 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                                         } else if (diff < -0.009) {
                                           return (
                                             <td key={`paygive-${col.id}`} className="px-4 py-2.5 text-xs">
-                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 font-bold border border-rose-300 dark:border-rose-700 shadow-2xs">
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-300 dark:border-emerald-700 shadow-2xs">
                                                 Pay ₹{Math.abs(diff).toFixed(2)}
                                               </span>
                                             </td>
@@ -2621,7 +2711,13 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                 )}
               </div>
 
-              {/* Add new spender button if typed string is new */}
+              {/* Duplicate check warning & Add new spender button */}
+              {spenderSearch.trim() && isExactMatch && (
+                <div className="px-2 py-1 mb-1 text-[11px] text-amber-600 dark:text-amber-400 font-medium bg-amber-50 dark:bg-amber-950/50 rounded border border-amber-200 dark:border-amber-800">
+                  Spender "{spenderSearch.trim()}" already exists in list
+                </div>
+              )}
+
               {spenderSearch.trim() && !isExactMatch && (
                 <button
                   type="button"
@@ -2643,19 +2739,34 @@ export default function TripExpense({ activePerson, partner1Name, partner2Name, 
                 )}
                 {filtered.length === 0 && spenderSearch.trim() && isExactMatch && (
                   <p className="text-xxs text-gray-400 text-center py-2 italic">
-                    No match
+                    No other match
                   </p>
                 )}
                 {filtered.map((name) => (
-                  <button
+                  <div
                     key={name}
-                    type="button"
-                    onClick={() => handleSelectSpender(activeSpenderPicker.tripId, activeSpenderPicker.entryId, name)}
-                    className="w-full text-left px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg font-medium transition-colors cursor-pointer truncate"
-                    title={name}
+                    className="flex items-center justify-between group/spitem hover:bg-indigo-50 dark:hover:bg-indigo-950/60 rounded-lg pr-1 transition-colors"
                   >
-                    {name}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSpender(activeSpenderPicker.tripId, activeSpenderPicker.entryId, name)}
+                      className="flex-1 text-left px-2.5 py-1.5 text-xs text-gray-700 dark:text-gray-200 group-hover/spitem:text-indigo-600 dark:group-hover/spitem:text-indigo-400 font-medium transition-colors cursor-pointer truncate"
+                      title={`Select ${name}`}
+                    >
+                      {name}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSpender(activeSpenderPicker.tripId, name);
+                      }}
+                      className="opacity-0 group-hover/spitem:opacity-100 p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-all cursor-pointer flex-shrink-0"
+                      title={`Delete "${name}" from spender list`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 ))}
               </div>
 

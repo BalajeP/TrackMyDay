@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   Calendar,
   Activity,
@@ -1281,23 +1281,104 @@ export default function App() {
     };
   }, []);
 
-  // Ensure profile avatar defaults to first letter of username / name for new accounts/sub-admins
-  useEffect(() => {
-    if (!userProfile) return;
-    const initial = (userProfile.username || userProfile.name || 'U').charAt(0).toUpperCase();
-    const displayName = userProfile.name || userProfile.username || 'User';
+  // Tenant-specific profile (Main Admin has their own profile, each sub-tenant has their own profile)
+  const [tenantProfile, setTenantProfile] = useState<PartnerProfile | null>(null);
 
-    if (!config.partner1 || config.partner1.name === 'Partner 1') {
-      const updatedPartner: PartnerProfile = {
-        name: displayName,
-        avatarType: 'letter',
-        letter: initial,
-        bgColor: userProfile.isMainAdmin ? '#6366f1' : '#10b981',
-      };
-      setConfig((prev) => ({ ...prev, partner1: updatedPartner }));
+  // Load tenant-specific avatar profile from localStorage and Supabase user_data
+  useEffect(() => {
+    if (!userProfile) {
+      setTenantProfile(null);
+      return;
+    }
+
+    const storageKey = `tmd_profile_${userProfile.id}`;
+    const localSaved = localStorage.getItem(storageKey);
+    let initialProfile: PartnerProfile | null = null;
+
+    if (localSaved) {
+      try {
+        const parsed = JSON.parse(localSaved);
+        if (parsed && typeof parsed === 'object') {
+          initialProfile = {
+            ...parsed,
+            name: userProfile.name || parsed.name || userProfile.username || 'User',
+          };
+        }
+      } catch (e) {}
+    }
+
+    if (!initialProfile) {
+      // Only if the user IS Main Admin, they can use customized config.partner1
+      if (userProfile.isMainAdmin && config.partner1 && config.partner1.name !== 'Partner 1') {
+        initialProfile = config.partner1;
+      } else {
+        // Sub-tenants NEVER inherit Main Admin's photo or profile!
+        const initial = (userProfile.name || userProfile.username || 'U').charAt(0).toUpperCase();
+        initialProfile = {
+          name: userProfile.name || userProfile.username || 'User',
+          avatarType: 'letter',
+          letter: initial,
+          bgColor: userProfile.isMainAdmin ? '#6366f1' : '#10b981',
+        };
+      }
+    }
+
+    setTenantProfile(initialProfile);
+
+    // Sync from Supabase user_data table for this specific user
+    supabase
+      .from('user_data')
+      .select('data_value')
+      .eq('user_id', userProfile.id)
+      .eq('data_key', 'tenant_profile')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data && data.data_value) {
+          const dbProfile = data.data_value as PartnerProfile;
+          setTenantProfile(dbProfile);
+          localStorage.setItem(storageKey, JSON.stringify(dbProfile));
+        }
+      });
+  }, [userProfile?.id, userProfile?.isMainAdmin]);
+
+  // Compute active user profile to display (strictly tenant-specific)
+  const activeUserProfile = useMemo<PartnerProfile>(() => {
+    if (tenantProfile) return tenantProfile;
+    if (!userProfile) return DEFAULT_PARTNER1;
+    const initial = (userProfile.name || userProfile.username || 'U').charAt(0).toUpperCase();
+    return {
+      name: userProfile.name || userProfile.username || 'User',
+      avatarType: 'letter',
+      letter: initial,
+      bgColor: userProfile.isMainAdmin ? '#6366f1' : '#10b981',
+    };
+  }, [tenantProfile, userProfile]);
+
+  // Save tenant-specific profile
+  const handleSaveTenantProfile = useCallback((p: PartnerProfile) => {
+    if (!userProfile) return;
+    setTenantProfile(p);
+    localStorage.setItem(`tmd_profile_${userProfile.id}`, JSON.stringify(p));
+
+    // If main admin, also save to config.partner1
+    if (userProfile.isMainAdmin) {
+      setConfig((s) => ({ ...s, partner1: p }));
       setTimeout(saveConfig, 0);
     }
-  }, [userProfile]);
+
+    // Save to user_data table in Supabase for this user_id
+    supabase
+      .from('user_data')
+      .upsert({
+        user_id: userProfile.id,
+        data_key: 'tenant_profile',
+        data_value: p,
+        updated_at: new Date().toISOString(),
+      })
+      .then(({ error }) => {
+        if (error) console.warn('[App] Error saving tenant_profile to Supabase:', error);
+      });
+  }, [userProfile, saveConfig]);
 
   // Unsaved-changes guard
   const [pendingTab, setPendingTab] = useState<Tab | null>(null);
@@ -1425,7 +1506,7 @@ export default function App() {
             </div>
 
             <div className="flex items-end gap-3 flex-shrink-0">
-              <UserAvatarBadge profile={partner1} />
+              <UserAvatarBadge profile={activeUserProfile} />
 
               {/* Settings Button */}
               <button
@@ -1550,8 +1631,11 @@ export default function App() {
 
       {editingPartner && (
         <AvatarPickerModal
-          profile={partner1}
-          onSave={setPartner1}
+          profile={activeUserProfile}
+          onSave={(p) => {
+            handleSaveTenantProfile(p);
+            setEditingPartner(null);
+          }}
           onClose={() => setEditingPartner(null)}
         />
       )}
@@ -1563,9 +1647,9 @@ export default function App() {
           lang={lang}
           onLangChange={setLang}
           userProfile={userProfile}
-          partner1={partner1}
+          partner1={activeUserProfile}
           onUpdateProfileName={(newName) => {
-            setPartner1({ ...partner1, name: newName });
+            handleSaveTenantProfile({ ...activeUserProfile, name: newName });
           }}
           onOpenAvatarPicker={() => setEditingPartner('partner1')}
           changePassword={changePassword}

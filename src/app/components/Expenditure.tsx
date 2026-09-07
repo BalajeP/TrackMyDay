@@ -2469,7 +2469,7 @@ export default function Expenditure({
 
                 <div
                   ref={modalTableContainerRef}
-                  className="overflow-x-auto overflow-y-auto max-h-[58vh] relative border border-gray-100 dark:border-gray-700 rounded-xl scrollbar-thin"
+                  className="overflow-x-auto overflow-y-auto min-h-[280px] max-h-[58vh] relative border border-gray-100 dark:border-gray-700 rounded-xl scrollbar-thin"
                 >
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="sticky top-0 z-20 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xs shadow-xs">
