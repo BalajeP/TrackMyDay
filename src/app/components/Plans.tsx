@@ -21,6 +21,8 @@ import {
   ListTodo,
   Layers,
   Flag,
+  Save,
+  Loader2,
 } from 'lucide-react';
 import ConfirmDialog from './ConfirmDialog';
 import { useSupabasePersistedState } from '../hooks/useSupabasePersistedState';
@@ -87,23 +89,62 @@ const PLAN_EMOJI_CATEGORIES = [
 ];
 
 interface PlansProps {
-  onUnsavedChanges?: (hasChanges: boolean) => void;
+  accessToken?: string | null;
+  onUnsavedChanges?: (hasChanges: boolean, saveFn: () => void) => void;
   isReadOnly?: boolean;
 }
 
-export default function Plans({ onUnsavedChanges, isReadOnly = false }: PlansProps) {
+export default function Plans({ accessToken, onUnsavedChanges, isReadOnly = false }: PlansProps) {
   // Main Persisted Plans Data
-  const [plansData, setPlansData] = useSupabasePersistedState<PlansData>('plans_data', DEFAULT_PLANS);
+  const [plansData, setPlansData, savePlans, hasUnsavedChanges, isLoaded] = useSupabasePersistedState<PlansData>(
+    'plans_data',
+    DEFAULT_PLANS,
+    DEFAULT_PLANS,
+    accessToken ?? null
+  );
+
+  const [showSaved, setShowSaved] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  // Propagate state status upwards to the parent component (App.tsx)
+  useEffect(() => {
+    if (isLoaded) {
+      onUnsavedChanges?.(hasUnsavedChanges, () => { savePlans(); });
+    }
+  }, [hasUnsavedChanges, isLoaded, savePlans, onUnsavedChanges]);
+
+  // Auto-save changes to Supabase database so plans persist immediately
+  useEffect(() => {
+    if (isLoaded && hasUnsavedChanges) {
+      const timer = setTimeout(async () => {
+        setIsSaving(true);
+        await savePlans();
+        setIsSaving(false);
+        setShowSaved(true);
+        const resetTimer = setTimeout(() => setShowSaved(false), 2000);
+        return () => clearTimeout(resetTimer);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [plansData, isLoaded, hasUnsavedChanges, savePlans]);
 
   // Filter out any legacy default sample plans so the user has a completely clean slate
   useEffect(() => {
-    if (plansData.plans.some((p) => ['plan-1', 'plan-2', 'plan-3', 'plan-4'].includes(p.id))) {
+    if (isLoaded && plansData.plans.some((p) => ['plan-1', 'plan-2', 'plan-3', 'plan-4'].includes(p.id))) {
       setPlansData((prev) => ({
         ...prev,
         plans: prev.plans.filter((p) => !['plan-1', 'plan-2', 'plan-3', 'plan-4'].includes(p.id)),
       }));
     }
-  }, []);
+  }, [isLoaded, plansData.plans, setPlansData]);
+
+  const handleManualSave = async () => {
+    setIsSaving(true);
+    await savePlans();
+    setIsSaving(false);
+    setShowSaved(true);
+    setTimeout(() => setShowSaved(false), 2000);
+  };
 
   // Active Filter: 'all' | 'short_term' | 'long_term'
   const [activeTabFilter, setActiveTabFilter] = useState<'all' | PlanType>('all');
@@ -367,6 +408,15 @@ export default function Plans({ onUnsavedChanges, isReadOnly = false }: PlansPro
     return { totalPlans, totalItems, completedItems, shortCount, longCount, percent };
   }, [plansData.plans]);
 
+  if (!isLoaded) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+        <p className="text-xs text-gray-500 dark:text-gray-400">Loading plans &amp; goals...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-12">
       {/* Header Banner */}
@@ -388,8 +438,8 @@ export default function Plans({ onUnsavedChanges, isReadOnly = false }: PlansPro
           </p>
         </div>
 
-        {/* Quick Stats Pill */}
-        <div className="flex items-center gap-3">
+        {/* Quick Stats Pill & Save Action */}
+        <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
           <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-xs px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-gray-700 flex items-center gap-2.5 shadow-2xs">
             <div className="text-right">
               <div className="text-xs font-bold text-gray-900 dark:text-gray-100">
@@ -403,6 +453,43 @@ export default function Plans({ onUnsavedChanges, isReadOnly = false }: PlansPro
               {stats.percent}%
             </div>
           </div>
+
+          <button
+            type="button"
+            onClick={handleManualSave}
+            disabled={isReadOnly || (!hasUnsavedChanges && !showSaved && !isSaving)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
+              showSaved
+                ? 'bg-emerald-600 text-white'
+                : isSaving
+                ? 'bg-indigo-600 text-white opacity-80'
+                : hasUnsavedChanges
+                ? 'bg-indigo-600 hover:bg-indigo-700 text-white ring-2 ring-indigo-300 animate-pulse'
+                : 'bg-white dark:bg-gray-800 text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-700'
+            }`}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : showSaved ? (
+              <>
+                <Check className="w-3.5 h-3.5" />
+                <span>Saved ✓</span>
+              </>
+            ) : hasUnsavedChanges ? (
+              <>
+                <Save className="w-3.5 h-3.5" />
+                <span>Save Plans</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                <span>All Saved</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
