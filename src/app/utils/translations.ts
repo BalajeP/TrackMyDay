@@ -14,6 +14,8 @@ export interface TranslationDictionary {
   logout: string;
   saveProfile: string;
   editProfile: string;
+  userGuide: string;
+  howItWorks: string;
 
   // Tabs
   activities: string;
@@ -86,6 +88,8 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
     logout: 'Logout',
     saveProfile: 'Save Profile',
     editProfile: 'Edit Profile',
+    userGuide: 'User Guide',
+    howItWorks: 'How It Works / Assist',
 
     activities: 'Activities',
     tracking: 'Tracking',
@@ -154,6 +158,8 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
     logout: 'வெளியேறு',
     saveProfile: 'சுயவிவரத்தை சேமி',
     editProfile: 'சுயவிவரத்தை திருத்து',
+    userGuide: 'பயனர் வழிகாட்டி',
+    howItWorks: 'எவ்வாறு செயல்படுகிறது / உதவி',
 
     activities: 'செயல்பாடுகள்',
     tracking: 'கண்காணிப்பு',
@@ -222,6 +228,8 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
     logout: 'लॉग आउट',
     saveProfile: 'प्रोफाइल सहेजें',
     editProfile: 'प्रोफाइल संपादित करें',
+    userGuide: 'उपयोगकर्ता गाइड',
+    howItWorks: 'यह कैसे काम करता है / सहायता',
 
     activities: 'गतिविधियां',
     tracking: 'ट्रैकिंग',

@@ -32,6 +32,9 @@ import {
   User,
   KeyRound,
   Target,
+  BookOpen,
+  HelpCircle,
+  Shield,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import DailyActivities from './components/DailyActivities';
@@ -43,12 +46,14 @@ import CalendarView from './components/CalendarView';
 import Tracking from './components/Tracking';
 import AuthPage from './components/AuthPage';
 import PWAWrapper from './components/PWAWrapper';
+import UserGuideModal from './components/UserGuideModal';
 import { useAuth, AppUserRecord, AppUserProfile } from './hooks/useAuth';
 import { useSupabasePersistedState } from './hooks/useSupabasePersistedState';
 import { usePWA } from './hooks/usePWA';
 import { Language, t } from './utils/translations';
 import { startNotificationScheduler, stopNotificationScheduler } from './utils/notificationScheduler';
 import { supabase } from '../lib/supabaseClient';
+import { APP_VERSION, APP_RELEASE_NAME } from './version';
 
 type Tab = 'activities' | 'meals' | 'workout' | 'plans' | 'expenses' | 'calendar' | 'tracking';
 type Person = 'partner1' | 'partner2' | 'both';
@@ -144,6 +149,7 @@ function SettingsModal({
   createAppUser,
   updateAppUser,
   deleteAppUser,
+  onOpenUserGuide,
   onClose,
 }: {
   theme: ThemeMode;
@@ -160,10 +166,11 @@ function SettingsModal({
   createAppUser: (newUser: Omit<AppUserRecord, 'id'>) => Promise<{ success: boolean; error?: string }>;
   updateAppUser: (id: string, updates: Partial<AppUserRecord>) => Promise<{ success: boolean; error?: string }>;
   deleteAppUser: (id: string) => Promise<{ success: boolean; error?: string }>;
+  onOpenUserGuide?: () => void;
   onClose: () => void;
 }) {
   const isMainAdmin = userProfile?.isMainAdmin || false;
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'account' | 'theme' | 'language' | 'password' | 'users'>('account');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'account' | 'theme' | 'language' | 'password' | 'guide' | 'users'>('account');
 
   // Account Info edit state
   const [profileNameInput, setProfileNameInput] = useState(partner1.name || userProfile?.name || '');
@@ -409,6 +416,7 @@ function SettingsModal({
     { id: 'theme' as const, label: 'Appearance & Theme', icon: Sun },
     { id: 'language' as const, label: 'Language', icon: Globe },
     { id: 'password' as const, label: 'Change Password', icon: KeyRound },
+    { id: 'guide' as const, label: 'User Guide & Assist', icon: BookOpen, badge: 'Help' },
     ...(isMainAdmin ? [{ id: 'users' as const, label: 'Sub-Tenant Creation', icon: Users, badge: 'Admin' }] : []),
   ];
 
@@ -713,7 +721,105 @@ function SettingsModal({
               </div>
             )}
 
-            {/* 5. SUB-TENANT CREATION (USER MANAGEMENT) */}
+            {/* 5. USER GUIDE & HOW IT WORKS / ASSIST */}
+            {activeSettingsTab === 'guide' && (
+              <div className="space-y-6 max-w-2xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                      <span>User Guide &amp; How It Works</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                      Visual walkthroughs, step-by-step documentation &amp; component assistance
+                    </p>
+                  </div>
+                  {onOpenUserGuide && (
+                    <button
+                      onClick={onOpenUserGuide}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-600/20 cursor-pointer self-start sm:self-auto"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      <span>Open Full Interactive Guide</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* App Version Info Card */}
+                <div className="p-4 bg-gradient-to-r from-indigo-50/80 via-purple-50/60 to-pink-50/60 dark:from-gray-800 dark:via-gray-850 dark:to-gray-800 border border-indigo-100 dark:border-gray-700 rounded-2xl flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs">
+                      <Shield className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-gray-900 dark:text-gray-100">{APP_RELEASE_NAME}</h4>
+                        <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-[9px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                          v{APP_VERSION}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                        Multi-tenant personal &amp; family daily organization platform
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Topics Grid */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-extrabold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Component Documentation &amp; Features
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { title: 'Trip Expense Management', icon: IndianRupee, desc: 'Spreadsheet splits, time cells, and settlement math.', color: 'text-emerald-500' },
+                      { title: 'Daily Activities & Habits', icon: Activity, desc: 'Daily checkmarks, streaks, and progress rings.', color: 'text-indigo-500' },
+                      { title: 'Tracking Reminders', icon: ListChecks, desc: 'Scheduled alerts, categories, and push alarms.', color: 'text-rose-500' },
+                      { title: 'Meal Schedule Planner', icon: Utensils, desc: 'Weekly Breakfast/Lunch/Dinner & PDF export.', color: 'text-amber-500' },
+                      { title: 'Workout & Body Weight', icon: Dumbbell, desc: 'Exercise routines and progressive weight logs.', color: 'text-cyan-500' },
+                      { title: 'Plans & Goals Roadmap', icon: Target, desc: 'Short vs Long term vision checklists & cloud sync.', color: 'text-purple-500' },
+                      { title: 'Calendar & Sacred Tithi', icon: Calendar, desc: 'Full event scheduler and lock-screen reminders.', color: 'text-pink-500' },
+                      { title: 'Multi-Tenant & Security', icon: Users, desc: 'Role permissions, avatars, themes, and sub-users.', color: 'text-blue-500' },
+                    ].map((item, idx) => {
+                      const Icon = item.icon;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={onOpenUserGuide}
+                          className="p-3.5 bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-xl hover:border-indigo-300 dark:hover:border-indigo-600 transition-all cursor-pointer group flex items-start gap-3"
+                        >
+                          <div className={`p-2 rounded-lg bg-white dark:bg-gray-800 shadow-2xs ${item.color} group-hover:scale-110 transition-transform`}>
+                            <Icon className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h5 className="text-xs font-bold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                              {item.title}
+                            </h5>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-normal">
+                              {item.desc}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {onOpenUserGuide && (
+                  <div className="pt-2">
+                    <button
+                      onClick={onOpenUserGuide}
+                      className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      <span>Launch Comprehensive Interactive Guide with Screenshots</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 6. SUB-TENANT CREATION (USER MANAGEMENT) */}
             {activeSettingsTab === 'users' && isMainAdmin && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1068,13 +1174,30 @@ function SettingsModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3 border-t border-gray-100 dark:border-gray-700 flex justify-end bg-gray-50/50 dark:bg-gray-900/50 flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors"
-          >
-            {t('done', lang)}
-          </button>
+        <div className="px-6 py-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between bg-gray-50/50 dark:bg-gray-900/50 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-gray-400 font-semibold">{APP_RELEASE_NAME}</span>
+            <span className="text-[10px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded-md font-mono font-bold">
+              v{APP_VERSION}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {onOpenUserGuide && (
+              <button
+                onClick={onOpenUserGuide}
+                className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span>User Guide</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="px-5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              {t('done', lang)}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1249,6 +1372,7 @@ export default function App() {
   const [trackingReminders, setTrackingReminders, saveTracking] = useSupabasePersistedState<TrackingReminder[]>('tracking_reminders', [], [], accessToken);
   const [editingPartner, setEditingPartner] = useState<'partner1' | 'partner2' | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showUserGuideModal, setShowUserGuideModal] = useState(false);
 
   // Theme State ('light' | 'dark')
   const [theme, setTheme] = useState<ThemeMode>(() => {
@@ -1490,6 +1614,9 @@ export default function App() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 leading-tight">{t('appName', lang)}</h1>
+                  <span className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-2xs">
+                    v{APP_VERSION}
+                  </span>
                   {userProfile?.isMainAdmin ? (
                     <span className="bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                       Main Admin
@@ -1507,6 +1634,18 @@ export default function App() {
 
             <div className="flex items-end gap-3 flex-shrink-0">
               <UserAvatarBadge profile={activeUserProfile} />
+
+              {/* User Guide & Assist Button */}
+              <button
+                onClick={() => setShowUserGuideModal(true)}
+                title={t('howItWorks', lang)}
+                className="flex flex-col items-center gap-1 group cursor-pointer"
+              >
+                <div className="w-11 h-11 rounded-full flex items-center justify-center ring-2 ring-indigo-200 dark:ring-indigo-800 hover:ring-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-all">
+                  <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400 group-hover:text-indigo-700 transition-colors" />
+                </div>
+                <span className="text-[10px] font-medium text-indigo-600 dark:text-indigo-400 group-hover:text-indigo-700">{t('userGuide', lang)}</span>
+              </button>
 
               {/* Settings Button */}
               <button
@@ -1658,7 +1797,21 @@ export default function App() {
           createAppUser={createAppUser}
           updateAppUser={updateAppUser}
           deleteAppUser={deleteAppUser}
+          onOpenUserGuide={() => {
+            setShowSettingsModal(false);
+            setShowUserGuideModal(true);
+          }}
           onClose={() => setShowSettingsModal(false)}
+        />
+      )}
+
+      {showUserGuideModal && (
+        <UserGuideModal
+          onClose={() => setShowUserGuideModal(false)}
+          onNavigateTab={(tabId) => {
+            setActiveTab(tabId as Tab);
+            setShowUserGuideModal(false);
+          }}
         />
       )}
       </div>
